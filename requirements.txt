@@ -69,6 +69,12 @@ tensorboard>=2.14.0
 tqdm>=4.66.0
 
 # -----------------------------------------------------------------------------
+# Interfaz Web
+# -----------------------------------------------------------------------------
+# Gradio para la aplicación web interactiva
+gradio>=5.0.0
+
+# -----------------------------------------------------------------------------
 # Roboflow (Opcional - para descarga directa de datasets)
 # -----------------------------------------------------------------------------
 # Descomenta si quieres descargar datasets directamente desde Roboflow
