@@ -12,7 +12,8 @@ Modelo de detección de objetos especializado en identificar **pilares de señal
 | mAP@50-95 | 87.4% |
 | Precisión | 91.7% |
 | Recall | 99.2% |
-| Inferencia | 3.5ms/imagen |
+| Inferencia PyTorch | 14ms/imagen (71 FPS) |
+| **Inferencia TensorRT FP16** | **5.5ms/imagen (180 FPS)** |
 
 ---
 
@@ -46,8 +47,12 @@ fine-tuning-vr/
 │   ├── inference.py             # Inferencia (imagen/video/webcam)
 │   ├── auto_annotate.py         # Auto-anotación con template matching
 │   ├── visualize_annotations.py # Visualizar anotaciones
-│   └── split_dataset.py         # Dividir train/val
-├── models/                      # Modelos guardados con versionado
+│   ├── review_annotations.py    # Revisor interactivo de anotaciones
+│   ├── split_dataset.py         # Dividir train/val
+│   ├── evaluate.py              # Evaluación de métricas
+│   ├── export_tensorrt.py       # Exportación a TensorRT/ONNX
+│   └── benchmark.py             # Comparar velocidad de formatos
+├── models/                      # Modelos (.pt, .onnx, .engine)
 └── runs/                        # Logs de entrenamiento
 ```
 
@@ -89,14 +94,30 @@ Configuración en `config.yaml`:
 # Imagen
 python scripts/inference.py --source imagen.jpg
 
-# Video
-python scripts/inference.py --source video.mp4
+# Video (usa TensorRT si está disponible)
+python scripts/inference.py --source video.mp4 --model models/vr_boxes_best_20251207_171823.engine
 
 # Webcam
 python scripts/inference.py --source 0 --show
 
-# Ajustar confianza
+# Ajustar confianza (default: 0.65)
 python scripts/inference.py --source video.mp4 --conf 0.5
+```
+
+### Exportar a TensorRT
+
+```bash
+# Exportar a TensorRT FP16 (2.5x más rápido)
+python scripts/export_tensorrt.py --format engine --half
+
+# Exportar a ONNX
+python scripts/export_tensorrt.py --format onnx
+```
+
+### Benchmark
+
+```bash
+python scripts/benchmark.py
 ```
 
 ---

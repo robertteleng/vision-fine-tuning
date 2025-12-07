@@ -110,32 +110,35 @@ Este documento registra las métricas de entrenamiento y comparativas de rendimi
 
 ---
 
-### Entrenamiento 4: 2024-12-07 - YOLOv12s 30 épocas + 92 frames auto-anotados
+### Entrenamiento 4: 2024-12-07 - YOLOv12s FINAL con pilares invertidos
 
 #### Configuración
 - **Modelo base**: yolo12s.pt
 - **GPU**: NVIDIA RTX 2060 (6GB VRAM)
 - **Batch size**: 8
 - **Image size**: 640
-- **Épocas**: 30
-- **Dataset**: 562 train / 139 val (+92 frames con pilares finos auto-anotados)
+- **Épocas**: 100
+- **Dataset**: 621 train / 139 val (pilares normales + 59 frames invertidos revisados manualmente)
 
 #### Métricas Finales
 | Métrica | Valor |
 |---------|-------|
-| Precision | - |
-| Recall | - |
-| mAP@50 | - |
-| mAP@50-95 | - |
+| Precision | 91.7% |
+| Recall | 99.2% |
+| mAP@50 | 98.7% |
+| mAP@50-95 | 87.4% |
 
 #### Tiempos
-- Tiempo total: EN CURSO
+- Tiempo total: ~24 min
 - Tiempo por época: ~14s
+- Inferencia PyTorch: 14ms/imagen
+- Inferencia TensorRT FP16: 5.5ms/imagen
 
 #### Observaciones
-- 92 frames (282-391) con pilares finos/invertidos
-- Auto-anotados con template matching (threshold 0.85)
-- Objetivo: detectar ambos tipos de pilares
+- 59 frames con pilares invertidos añadidos tras revisión manual
+- Detecta correctamente ambos tipos de pilares
+- Confianza threshold: 0.65 para filtrar ghost detections
+- Modelo exportado a TensorRT FP16
 
 ---
 
@@ -146,7 +149,7 @@ Este documento registra las métricas de entrenamiento y comparativas de rendimi
 | #1 | YOLOv8n | 10 | 96.4% | 62.7% | 5ms |
 | #2 | YOLOv12s | 50 | 97.9% | 84.7% | 4ms |
 | #3 | YOLOv12s | 100 | 98.7% | 87.4% | 3.5ms |
-| #4 | YOLOv12s | 30 | - | - | - |
+| **#4 FINAL** | YOLOv12s | 100 | 98.7% | 87.4% | **5.5ms TRT** |
 
 **Conclusión:** YOLOv12s supera a YOLOv8n significativamente en mAP50-95, lo que indica mejor localización de bounding boxes.
 
@@ -185,12 +188,23 @@ amp: true
 
 ---
 
+## Benchmark de Inferencia por Formato
+
+| Formato | Velocidad | FPS | Speedup | Tamaño |
+|---------|-----------|-----|---------|--------|
+| PyTorch (.pt) | 14.0 ms | 71 | 1x | 18 MB |
+| ONNX (.onnx) | 19.4 ms | 52 | 0.7x | 35.5 MB |
+| **TensorRT FP16 (.engine)** | **5.5 ms** | **180** | **2.5x** | 21 MB |
+
+**Conclusión:** TensorRT FP16 es 2.5x más rápido que PyTorch nativo.
+
+---
+
 ## Próximos Experimentos
 
-- [ ] Evaluar resultados con 92 frames invertidos
-- [ ] Probar batch=16 si hay margen de VRAM
-- [ ] Exportar a TensorRT
-- [ ] Benchmark de inferencia en video continuo
+- [x] ~~Evaluar resultados con frames invertidos~~ COMPLETADO
+- [x] ~~Exportar a TensorRT~~ COMPLETADO
+- [ ] Probar con más videos de prueba
 - [ ] Comparativa cuando llegue RTX 5060 Ti
 
 ---
