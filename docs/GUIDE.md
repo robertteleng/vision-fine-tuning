@@ -222,4 +222,4 @@ La app usa:
 
 ---
 
-*Última actualización: Diciembre 2024*
+*Última actualización: Diciembre 2025*

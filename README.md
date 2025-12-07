@@ -310,4 +310,4 @@ Temperatura típica durante entrenamiento: 65-70°C
 
 ---
 
-*Última actualización: Diciembre 2024*
+*Última actualización: Diciembre 2025*

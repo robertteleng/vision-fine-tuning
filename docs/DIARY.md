@@ -5,7 +5,7 @@ Fine-tuning de YOLO para detectar cajas con patrón tablero amarillo-negro en VR
 
 ---
 
-## 2024-12-03 - Inicio del Desarrollo
+## 2025-12-03 - Inicio del Desarrollo
 
 ### Estado Inicial del Proyecto
 **Archivos existentes:**
@@ -26,7 +26,7 @@ Fine-tuning de YOLO para detectar cajas con patrón tablero amarillo-negro en VR
 
 ---
 
-## 2024-12-07 - Sesión de Desarrollo Intensivo
+## 2025-12-07 - Sesión de Desarrollo Intensivo
 
 ### Problema 1: Template Matching con Falsos Positivos
 
@@ -252,4 +252,4 @@ docs/           48KB (documentación)
 
 ---
 
-*Última actualización: 7 Diciembre 2024*
+*Última actualización: 7 Diciembre 2025*

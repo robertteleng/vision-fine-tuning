@@ -19,7 +19,7 @@ Este documento registra las métricas de entrenamiento y comparativas de rendimi
 
 ## Historial de Entrenamientos
 
-### Entrenamiento 1: 2024-12-07 - YOLOv8n Baseline
+### Entrenamiento 1: 2025-12-07 - YOLOv8n Baseline
 
 #### Configuración
 - **Modelo base**: yolov8n.pt
@@ -49,7 +49,7 @@ Este documento registra las métricas de entrenamiento y comparativas de rendimi
 
 ---
 
-### Entrenamiento 2: 2024-12-07 - YOLOv12s 50 épocas
+### Entrenamiento 2: 2025-12-07 - YOLOv12s 50 épocas
 
 #### Configuración
 - **Modelo base**: yolo12s.pt
@@ -79,7 +79,7 @@ Este documento registra las métricas de entrenamiento y comparativas de rendimi
 
 ---
 
-### Entrenamiento 3: 2024-12-07 - YOLOv12s 100 épocas + 7 frames invertidos
+### Entrenamiento 3: 2025-12-07 - YOLOv12s 100 épocas + 7 frames invertidos
 
 #### Configuración
 - **Modelo base**: yolo12s.pt
@@ -110,7 +110,7 @@ Este documento registra las métricas de entrenamiento y comparativas de rendimi
 
 ---
 
-### Entrenamiento 4: 2024-12-07 - YOLOv12s FINAL con pilares invertidos
+### Entrenamiento 4: 2025-12-07 - YOLOv12s FINAL con pilares invertidos
 
 #### Configuración
 - **Modelo base**: yolo12s.pt
@@ -209,4 +209,4 @@ amp: true
 
 ---
 
-*Última actualización: 7 Diciembre 2024*
+*Última actualización: 7 Diciembre 2025*
