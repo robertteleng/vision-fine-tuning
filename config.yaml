@@ -41,7 +41,7 @@ names:
 #   - yolov11n.pt, yolov11s.pt, etc.
 #
 # Para RTX 2060 con dataset pequeño, 'n' o 's' son suficientes
-model: "yolov8n.pt"
+model: "yolo12s.pt"
 
 # -----------------------------------------------------------------------------
 # PARÁMETROS DE ENTRENAMIENTO - GPU DEPENDIENTES
@@ -185,7 +185,7 @@ copy_paste: 0.0
 # -----------------------------------------------------------------------------
 
 # Directorio para guardar resultados
-project: "runs/train"
+project: "~/Projects/fine-tuning-vr/runs/train"
 
 # Nombre del experimento (None = auto-incrementa exp, exp2, etc.)
 # Puedes especificar un nombre como "rtx2060_batch8_v1"

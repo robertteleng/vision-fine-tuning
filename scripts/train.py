@@ -245,7 +245,7 @@ def train(args):
     # PASO 3: PREPARAR DATASET
     # =========================================================================
     logger.info("Preparando dataset...")
-    data_yaml_path = create_data_yaml(config, PROJECT_ROOT)
+    data_yaml_path = str(PROJECT_ROOT / 'data' / 'pillar.yaml')
 
     # =========================================================================
     # PASO 4: INICIALIZAR MODELO
