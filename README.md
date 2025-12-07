@@ -4,6 +4,29 @@
 
 Modelo de detección de objetos especializado en identificar **pilares de señalización amarillo/negro** en entornos de Realidad Virtual. El modelo está optimizado para tiempo real usando YOLOv12s.
 
+## Pipeline del Proyecto
+
+```mermaid
+flowchart LR
+    subgraph Datos
+        A[🎥 Video VR] --> B[📸 Extraer Frames]
+        B --> C[🏷️ Anotar]
+    end
+
+    subgraph Entrenamiento
+        C --> D[🧠 Fine-tune YOLO12s]
+        D --> E[📊 Evaluar Métricas]
+    end
+
+    subgraph Producción
+        E --> F[⚡ Exportar TensorRT]
+        F --> G[🚀 Inferencia 180 FPS]
+    end
+
+    style A fill:#e1f5fe
+    style G fill:#c8e6c9
+```
+
 ## Resultados Actuales
 
 | Métrica | Valor |
