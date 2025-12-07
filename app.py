@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-VR Pillar Detector - Aplicación Gradio
+VR Pillar Detector - Gradio Application
 
-Interfaz web para detección de pilares en entornos VR.
+Web interface for pillar detection in VR environments.
 
-Uso:
+Usage:
     python app.py
-    python app.py --share  # Compartir públicamente
+    python app.py --share  # Share publicly
 """
 
 import sys
@@ -21,14 +21,14 @@ import numpy as np
 from PIL import Image
 
 # ============================================================================
-# CONFIGURACIÓN
+# CONFIGURATION
 # ============================================================================
 
 APP_TITLE = "VR Pillar Detector"
 APP_DESCRIPTION = """
-Detección de pilares de señalización amarillo/negro en entornos de Realidad Virtual.
+Detection of yellow/black signaling pillars in Virtual Reality environments.
 
-**Modelo:** YOLOv12s fine-tuned | **Precisión:** 98.7% mAP@50 | **Velocidad:** 180 FPS (TensorRT)
+**Model:** YOLOv12s fine-tuned | **Precision:** 98.7% mAP@50 | **Speed:** 180 FPS (TensorRT)
 """
 
 MODELS_DIR = PROJECT_ROOT / "models"
@@ -36,25 +36,25 @@ DATA_DIR = PROJECT_ROOT / "data"
 
 
 # ============================================================================
-# FUNCIONES AUXILIARES
+# HELPER FUNCTIONS
 # ============================================================================
 
 def find_available_models():
-    """Encuentra todos los modelos disponibles."""
+    """Find all available models."""
     models = []
     if MODELS_DIR.exists():
         for ext in ["*.engine", "*.pt", "*.onnx"]:
             models.extend(MODELS_DIR.glob(ext))
-    return sorted(models, key=lambda x: x.suffix != ".engine")  # TensorRT primero
+    return sorted(models, key=lambda x: x.suffix != ".engine")  # TensorRT first
 
 
 def get_model_info():
-    """Obtiene información sobre los modelos disponibles."""
+    """Get information about available models."""
     models = find_available_models()
     if not models:
-        return "No se encontraron modelos en la carpeta models/"
+        return "No models found in models/ folder"
 
-    info = "**Modelos disponibles:**\n\n"
+    info = "**Available models:**\n\n"
     for m in models:
         size_mb = m.stat().st_size / (1024 * 1024)
         format_name = {
@@ -68,49 +68,49 @@ def get_model_info():
 
 
 def load_model(model_path: str = None):
-    """Carga el modelo YOLO."""
+    """Load the YOLO model."""
     from ultralytics import YOLO
 
     if model_path and Path(model_path).exists():
         return YOLO(model_path)
 
-    # Buscar mejor modelo disponible
+    # Find best available model
     models = find_available_models()
     if models:
         return YOLO(str(models[0]))
 
-    raise FileNotFoundError("No se encontró ningún modelo")
+    raise FileNotFoundError("No model found")
 
 
 # ============================================================================
-# TAB: INFERENCIA
+# TAB: INFERENCE
 # ============================================================================
 
 def run_inference_image(image, model_choice, confidence, iou_threshold):
-    """Ejecuta inferencia en una imagen."""
+    """Run inference on an image."""
     if image is None:
-        return None, "Por favor, sube una imagen"
+        return None, "Please upload an image"
 
     try:
-        # Cargar modelo
+        # Load model
         model_path = MODELS_DIR / model_choice if model_choice else None
         model = load_model(str(model_path) if model_path else None)
 
-        # Ejecutar inferencia
+        # Run inference
         results = model(image, conf=confidence, iou=iou_threshold, verbose=False)
 
-        # Obtener imagen con anotaciones
+        # Get annotated image
         annotated = results[0].plot()
 
-        # Estadísticas
+        # Statistics
         num_detections = len(results[0].boxes)
         if num_detections > 0:
             confs = results[0].boxes.conf.cpu().numpy()
-            stats = f"**Detecciones:** {num_detections}\n\n"
-            stats += f"**Confianza:** {confs.min():.2f} - {confs.max():.2f}\n\n"
-            stats += f"**Media:** {confs.mean():.2f}"
+            stats = f"**Detections:** {num_detections}\n\n"
+            stats += f"**Confidence:** {confs.min():.2f} - {confs.max():.2f}\n\n"
+            stats += f"**Mean:** {confs.mean():.2f}"
         else:
-            stats = "**No se detectaron pilares**"
+            stats = "**No pillars detected**"
 
         return annotated, stats
 
@@ -119,25 +119,25 @@ def run_inference_image(image, model_choice, confidence, iou_threshold):
 
 
 def run_inference_video(video_path, model_choice, confidence, iou_threshold, progress=gr.Progress()):
-    """Ejecuta inferencia en un video."""
+    """Run inference on a video."""
     import cv2
     import tempfile
 
     if video_path is None:
-        return None, "Por favor, sube un video"
+        return None, "Please upload a video"
 
     try:
         model_path = MODELS_DIR / model_choice if model_choice else None
         model = load_model(str(model_path) if model_path else None)
 
-        # Abrir video
+        # Open video
         cap = cv2.VideoCapture(video_path)
         fps = int(cap.get(cv2.CAP_PROP_FPS))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        # Crear video de salida
+        # Create output video
         output_path = tempfile.mktemp(suffix=".mp4")
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
@@ -150,7 +150,7 @@ def run_inference_video(video_path, model_choice, confidence, iou_threshold, pro
             if not ret:
                 break
 
-            # Inferencia
+            # Inference
             results = model(frame, conf=confidence, iou=iou_threshold, verbose=False)
             annotated = results[0].plot()
             out.write(annotated)
@@ -158,15 +158,15 @@ def run_inference_video(video_path, model_choice, confidence, iou_threshold, pro
             total_detections += len(results[0].boxes)
             frame_count += 1
 
-            # Actualizar progreso
+            # Update progress
             progress(frame_count / total_frames, desc=f"Frame {frame_count}/{total_frames}")
 
         cap.release()
         out.release()
 
-        stats = f"**Frames procesados:** {frame_count}\n\n"
-        stats += f"**Detecciones totales:** {total_detections}\n\n"
-        stats += f"**Promedio por frame:** {total_detections/frame_count:.1f}"
+        stats = f"**Frames processed:** {frame_count}\n\n"
+        stats += f"**Total detections:** {total_detections}\n\n"
+        stats += f"**Average per frame:** {total_detections/frame_count:.1f}"
 
         return output_path, stats
 
@@ -175,54 +175,54 @@ def run_inference_video(video_path, model_choice, confidence, iou_threshold, pro
 
 
 # ============================================================================
-# TAB: MÉTRICAS
+# TAB: METRICS
 # ============================================================================
 
 def get_training_metrics():
-    """Lee las métricas del último entrenamiento."""
+    """Read metrics from last training."""
     metrics = """
-## Resultados del Modelo Final (Entrenamiento #4)
+## Final Model Results (Training #4)
 
-| Métrica | Valor |
-|---------|-------|
+| Metric | Value |
+|--------|-------|
 | **mAP@50** | 98.7% |
 | **mAP@50-95** | 87.4% |
-| **Precisión** | 91.7% |
+| **Precision** | 91.7% |
 | **Recall** | 99.2% |
 
-## Benchmark de Inferencia (RTX 2060)
+## Inference Benchmark (RTX 2060)
 
-| Formato | Velocidad | FPS | Speedup |
-|---------|-----------|-----|---------|
+| Format | Speed | FPS | Speedup |
+|--------|-------|-----|---------|
 | PyTorch (.pt) | 14.0 ms | 71 | 1x |
 | ONNX (.onnx) | 19.4 ms | 52 | 0.7x |
 | **TensorRT FP16** | **5.5 ms** | **180** | **2.5x** |
 
 ## Dataset
 
-- **Training:** 621 imágenes
-- **Validation:** 139 imágenes
-- **Clases:** 1 (pillar)
+- **Training:** 621 images
+- **Validation:** 139 images
+- **Classes:** 1 (pillar)
 """
     return metrics
 
 
 def run_benchmark(iterations, progress=gr.Progress()):
-    """Ejecuta benchmark de velocidad."""
+    """Run speed benchmark."""
     import time
     import torch
 
     models = find_available_models()
     if not models:
-        return "No se encontraron modelos"
+        return "No models found"
 
-    results = "## Resultados del Benchmark\n\n"
-    results += f"**Iteraciones:** {iterations}\n\n"
+    results = "## Benchmark Results\n\n"
+    results += f"**Iterations:** {iterations}\n\n"
 
-    # Imagen dummy
+    # Dummy image
     dummy_img = np.random.randint(0, 255, (640, 640, 3), dtype=np.uint8)
 
-    for model_path in progress.tqdm(models, desc="Evaluando modelos"):
+    for model_path in progress.tqdm(models, desc="Evaluating models"):
         try:
             from ultralytics import YOLO
             model = YOLO(str(model_path))
@@ -253,7 +253,7 @@ def run_benchmark(iterations, progress=gr.Progress()):
             }.get(model_path.suffix, model_path.suffix)
 
             results += f"### {format_name} (`{model_path.name}`)\n"
-            results += f"- **Velocidad:** {mean_ms:.2f} ms\n"
+            results += f"- **Speed:** {mean_ms:.2f} ms\n"
             results += f"- **FPS:** {fps:.1f}\n\n"
 
         except Exception as e:
@@ -263,31 +263,31 @@ def run_benchmark(iterations, progress=gr.Progress()):
 
 
 # ============================================================================
-# TAB: ENTRENAMIENTO
+# TAB: TRAINING
 # ============================================================================
 
 def start_training(epochs, batch_size, model_base, progress=gr.Progress()):
-    """Inicia el entrenamiento del modelo."""
+    """Start model training."""
     try:
         from ultralytics import YOLO
         import yaml
 
-        # Cargar configuración
+        # Load configuration
         config_path = PROJECT_ROOT / "config.yaml"
         with open(config_path) as f:
             config = yaml.safe_load(f)
 
-        # Actualizar parámetros
+        # Update parameters
         config["epochs"] = epochs
         config["batch"] = batch_size
 
-        # Cargar modelo base
+        # Load base model
         model = YOLO(model_base)
 
         # Dataset
         data_yaml = PROJECT_ROOT / "data" / "pillar.yaml"
 
-        # Entrenar
+        # Train
         results = model.train(
             data=str(data_yaml),
             epochs=epochs,
@@ -297,27 +297,27 @@ def start_training(epochs, batch_size, model_base, progress=gr.Progress()):
             verbose=True
         )
 
-        return f"Entrenamiento completado. Resultados en: {results.save_dir}"
+        return f"Training completed. Results in: {results.save_dir}"
 
     except Exception as e:
-        return f"Error durante el entrenamiento: {str(e)}"
+        return f"Error during training: {str(e)}"
 
 
 def get_training_status():
-    """Obtiene el estado del entrenamiento."""
+    """Get training status."""
     runs_dir = PROJECT_ROOT / "runs" / "train"
     if not runs_dir.exists():
-        return "No hay entrenamientos previos"
+        return "No previous trainings"
 
     experiments = sorted(runs_dir.glob("*/"), reverse=True)
     if not experiments:
-        return "No hay entrenamientos previos"
+        return "No previous trainings"
 
-    status = "## Entrenamientos Anteriores\n\n"
+    status = "## Previous Trainings\n\n"
     for exp in experiments[:5]:
         status += f"- `{exp.name}`\n"
 
-        # Buscar métricas
+        # Find metrics
         results_csv = exp / "results.csv"
         if results_csv.exists():
             import csv
@@ -326,17 +326,17 @@ def get_training_status():
                 rows = list(reader)
                 if rows:
                     last = rows[-1]
-                    status += f"  - Épocas: {len(rows)}\n"
+                    status += f"  - Epochs: {len(rows)}\n"
 
     return status
 
 
 # ============================================================================
-# TAB: ANOTACIONES
+# TAB: ANNOTATIONS
 # ============================================================================
 
 class AnnotationReviewer:
-    """Revisor de anotaciones para Gradio."""
+    """Annotation reviewer for Gradio."""
 
     def __init__(self):
         self.images_dir = None
@@ -346,42 +346,42 @@ class AnnotationReviewer:
         self.annotations = []
 
     def load_dataset(self, dataset_path: str):
-        """Carga un dataset para revisar."""
+        """Load a dataset for review."""
         dataset_path = Path(dataset_path) if dataset_path else DATA_DIR / "dataset" / "train"
 
         self.images_dir = dataset_path / "images"
         self.labels_dir = dataset_path / "labels"
 
         if not self.images_dir.exists():
-            return None, f"No se encontró: {self.images_dir}", "0 / 0"
+            return None, f"Not found: {self.images_dir}", "0 / 0"
 
         self.image_files = sorted(self.images_dir.glob("*.jpg"))
         if not self.image_files:
             self.image_files = sorted(self.images_dir.glob("*.png"))
 
         if not self.image_files:
-            return None, "No se encontraron imágenes", "0 / 0"
+            return None, "No images found", "0 / 0"
 
         self.current_idx = 0
         return self._load_current()
 
     def _load_current(self):
-        """Carga la imagen y anotaciones actuales."""
+        """Load current image and annotations."""
         if not self.image_files:
-            return None, "No hay imágenes", "0 / 0"
+            return None, "No images", "0 / 0"
 
         img_path = self.image_files[self.current_idx]
         label_path = self.labels_dir / f"{img_path.stem}.txt"
 
-        # Cargar imagen
+        # Load image
         img = cv2.imread(str(img_path))
         if img is None:
-            return None, f"Error cargando: {img_path.name}", f"{self.current_idx + 1} / {len(self.image_files)}"
+            return None, f"Error loading: {img_path.name}", f"{self.current_idx + 1} / {len(self.image_files)}"
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         h, w = img.shape[:2]
 
-        # Cargar anotaciones
+        # Load annotations
         self.annotations = []
         if label_path.exists():
             with open(label_path, 'r') as f:
@@ -397,7 +397,7 @@ class AnnotationReviewer:
                             'h': float(parts[4])
                         })
 
-        # Dibujar anotaciones
+        # Draw annotations
         img_display = img.copy()
         for ann in self.annotations:
             cx, cy = int(ann['x'] * w), int(ann['y'] * h)
@@ -409,38 +409,38 @@ class AnnotationReviewer:
             cv2.putText(img_display, str(ann['id']), (x1, y1 - 5),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-        info = f"**{img_path.name}** - {len(self.annotations)} anotaciones"
+        info = f"**{img_path.name}** - {len(self.annotations)} annotations"
         counter = f"{self.current_idx + 1} / {len(self.image_files)}"
 
         return img_display, info, counter
 
     def next_image(self):
-        """Siguiente imagen."""
+        """Next image."""
         if self.image_files and self.current_idx < len(self.image_files) - 1:
             self.current_idx += 1
         return self._load_current()
 
     def prev_image(self):
-        """Imagen anterior."""
+        """Previous image."""
         if self.image_files and self.current_idx > 0:
             self.current_idx -= 1
         return self._load_current()
 
     def goto_image(self, idx: int):
-        """Ir a imagen específica."""
+        """Go to specific image."""
         if self.image_files and 0 <= idx - 1 < len(self.image_files):
             self.current_idx = idx - 1
         return self._load_current()
 
     def delete_annotation(self, ann_id: int):
-        """Elimina una anotación y guarda."""
+        """Delete an annotation and save."""
         if not self.image_files:
             return self._load_current()
 
-        # Filtrar anotación
+        # Filter annotation
         self.annotations = [a for a in self.annotations if a['id'] != ann_id]
 
-        # Guardar
+        # Save
         img_path = self.image_files[self.current_idx]
         label_path = self.labels_dir / f"{img_path.stem}.txt"
 
@@ -451,7 +451,7 @@ class AnnotationReviewer:
         return self._load_current()
 
     def delete_all_annotations(self):
-        """Elimina todas las anotaciones de la imagen actual."""
+        """Delete all annotations from current image."""
         if not self.image_files:
             return self._load_current()
 
@@ -461,17 +461,17 @@ class AnnotationReviewer:
         label_path = self.labels_dir / f"{img_path.stem}.txt"
 
         with open(label_path, 'w') as f:
-            pass  # Archivo vacío
+            pass  # Empty file
 
         return self._load_current()
 
 
-# Instancia global del revisor
+# Global reviewer instance
 annotation_reviewer = AnnotationReviewer()
 
 
 def load_annotations_dataset(dataset_choice):
-    """Wrapper para cargar dataset."""
+    """Wrapper to load dataset."""
     if dataset_choice == "Train":
         path = DATA_DIR / "dataset" / "train"
     else:
@@ -500,13 +500,13 @@ def annotations_delete_all():
 
 
 # ============================================================================
-# INTERFAZ GRADIO
+# GRADIO INTERFACE
 # ============================================================================
 
 def create_app():
-    """Crea la aplicación Gradio."""
+    """Create the Gradio application."""
 
-    # Lista de modelos para dropdown
+    # Model list for dropdown
     model_choices = [m.name for m in find_available_models()]
     default_model = model_choices[0] if model_choices else None
 
@@ -517,39 +517,39 @@ def create_app():
 
         with gr.Tabs():
             # ----------------------------------------------------------------
-            # TAB: INFERENCIA
+            # TAB: INFERENCE
             # ----------------------------------------------------------------
-            with gr.TabItem("Inferencia", id="inference"):
+            with gr.TabItem("Inference", id="inference"):
                 with gr.Tabs():
-                    # Sub-tab: Imagen
-                    with gr.TabItem("Imagen"):
+                    # Sub-tab: Image
+                    with gr.TabItem("Image"):
                         with gr.Row():
                             with gr.Column():
                                 img_input = gr.Image(
-                                    label="Imagen de entrada",
+                                    label="Input image",
                                     type="numpy"
                                 )
                                 with gr.Row():
                                     img_model = gr.Dropdown(
                                         choices=model_choices,
                                         value=default_model,
-                                        label="Modelo"
+                                        label="Model"
                                     )
                                 with gr.Row():
                                     img_conf = gr.Slider(
                                         0.1, 1.0, value=0.65,
                                         step=0.05,
-                                        label="Confianza mínima"
+                                        label="Min confidence"
                                     )
                                     img_iou = gr.Slider(
                                         0.1, 1.0, value=0.45,
                                         step=0.05,
                                         label="IoU threshold"
                                     )
-                                img_btn = gr.Button("Detectar", variant="primary")
+                                img_btn = gr.Button("Detect", variant="primary")
 
                             with gr.Column():
-                                img_output = gr.Image(label="Resultado")
+                                img_output = gr.Image(label="Result")
                                 img_stats = gr.Markdown()
 
                         img_btn.click(
@@ -562,28 +562,28 @@ def create_app():
                     with gr.TabItem("Video"):
                         with gr.Row():
                             with gr.Column():
-                                vid_input = gr.Video(label="Video de entrada")
+                                vid_input = gr.Video(label="Input video")
                                 with gr.Row():
                                     vid_model = gr.Dropdown(
                                         choices=model_choices,
                                         value=default_model,
-                                        label="Modelo"
+                                        label="Model"
                                     )
                                 with gr.Row():
                                     vid_conf = gr.Slider(
                                         0.1, 1.0, value=0.65,
                                         step=0.05,
-                                        label="Confianza mínima"
+                                        label="Min confidence"
                                     )
                                     vid_iou = gr.Slider(
                                         0.1, 1.0, value=0.45,
                                         step=0.05,
                                         label="IoU threshold"
                                     )
-                                vid_btn = gr.Button("Procesar Video", variant="primary")
+                                vid_btn = gr.Button("Process Video", variant="primary")
 
                             with gr.Column():
-                                vid_output = gr.Video(label="Resultado")
+                                vid_output = gr.Video(label="Result")
                                 vid_stats = gr.Markdown()
 
                         vid_btn.click(
@@ -593,28 +593,28 @@ def create_app():
                         )
 
             # ----------------------------------------------------------------
-            # TAB: MÉTRICAS
+            # TAB: METRICS
             # ----------------------------------------------------------------
-            with gr.TabItem("Métricas", id="metrics"):
+            with gr.TabItem("Metrics", id="metrics"):
                 with gr.Row():
                     with gr.Column():
-                        gr.Markdown("## Métricas del Modelo")
+                        gr.Markdown("## Model Metrics")
                         metrics_display = gr.Markdown(get_training_metrics())
 
                     with gr.Column():
-                        gr.Markdown("## Modelos Disponibles")
+                        gr.Markdown("## Available Models")
                         models_info = gr.Markdown(get_model_info())
 
                 gr.Markdown("---")
-                gr.Markdown("## Benchmark en Vivo")
+                gr.Markdown("## Live Benchmark")
 
                 with gr.Row():
                     bench_iterations = gr.Slider(
                         10, 200, value=50,
                         step=10,
-                        label="Iteraciones"
+                        label="Iterations"
                     )
-                    bench_btn = gr.Button("Ejecutar Benchmark", variant="secondary")
+                    bench_btn = gr.Button("Run Benchmark", variant="secondary")
 
                 bench_results = gr.Markdown()
 
@@ -625,17 +625,17 @@ def create_app():
                 )
 
             # ----------------------------------------------------------------
-            # TAB: ENTRENAMIENTO
+            # TAB: TRAINING
             # ----------------------------------------------------------------
-            with gr.TabItem("Entrenamiento", id="training"):
-                gr.Markdown("## Configuración de Entrenamiento")
+            with gr.TabItem("Training", id="training"):
+                gr.Markdown("## Training Configuration")
 
                 with gr.Row():
                     with gr.Column():
                         train_epochs = gr.Slider(
                             10, 200, value=50,
                             step=10,
-                            label="Épocas"
+                            label="Epochs"
                         )
                         train_batch = gr.Slider(
                             4, 16, value=8,
@@ -645,12 +645,12 @@ def create_app():
                         train_model = gr.Dropdown(
                             choices=["yolo12s.pt", "yolo12n.pt", "yolo11s.pt", "yolo11n.pt"],
                             value="yolo12s.pt",
-                            label="Modelo Base"
+                            label="Base Model"
                         )
-                        train_btn = gr.Button("Iniciar Entrenamiento", variant="primary")
+                        train_btn = gr.Button("Start Training", variant="primary")
 
                     with gr.Column():
-                        gr.Markdown("## Estado")
+                        gr.Markdown("## Status")
                         train_status = gr.Markdown(get_training_status())
 
                 train_output = gr.Markdown()
@@ -662,11 +662,11 @@ def create_app():
                 )
 
             # ----------------------------------------------------------------
-            # TAB: ANOTACIONES
+            # TAB: ANNOTATIONS
             # ----------------------------------------------------------------
-            with gr.TabItem("Anotaciones", id="annotations"):
-                gr.Markdown("## Revisor de Anotaciones")
-                gr.Markdown("Revisa y edita las anotaciones del dataset.")
+            with gr.TabItem("Annotations", id="annotations"):
+                gr.Markdown("## Annotation Reviewer")
+                gr.Markdown("Review and edit dataset annotations.")
 
                 with gr.Row():
                     ann_dataset = gr.Radio(
@@ -674,28 +674,28 @@ def create_app():
                         value="Train",
                         label="Dataset"
                     )
-                    ann_load_btn = gr.Button("Cargar Dataset", variant="primary")
+                    ann_load_btn = gr.Button("Load Dataset", variant="primary")
 
                 with gr.Row():
                     with gr.Column(scale=3):
-                        ann_image = gr.Image(label="Imagen con anotaciones")
+                        ann_image = gr.Image(label="Image with annotations")
 
                     with gr.Column(scale=1):
-                        ann_info = gr.Markdown("Selecciona un dataset")
-                        ann_counter = gr.Textbox(label="Progreso", value="0 / 0", interactive=False)
+                        ann_info = gr.Markdown("Select a dataset")
+                        ann_counter = gr.Textbox(label="Progress", value="0 / 0", interactive=False)
 
                         with gr.Row():
-                            ann_prev_btn = gr.Button("< Anterior")
-                            ann_next_btn = gr.Button("Siguiente >")
+                            ann_prev_btn = gr.Button("< Previous")
+                            ann_next_btn = gr.Button("Next >")
 
-                        ann_goto = gr.Number(label="Ir a imagen #", value=1, precision=0)
-                        ann_goto_btn = gr.Button("Ir")
+                        ann_goto = gr.Number(label="Go to image #", value=1, precision=0)
+                        ann_goto_btn = gr.Button("Go")
 
                         gr.Markdown("---")
-                        gr.Markdown("### Eliminar anotaciones")
-                        ann_delete_id = gr.Number(label="ID de anotación", value=0, precision=0)
-                        ann_delete_btn = gr.Button("Eliminar anotacion", variant="secondary")
-                        ann_delete_all_btn = gr.Button("Eliminar TODAS", variant="stop")
+                        gr.Markdown("### Delete annotations")
+                        ann_delete_id = gr.Number(label="Annotation ID", value=0, precision=0)
+                        ann_delete_btn = gr.Button("Delete annotation", variant="secondary")
+                        ann_delete_all_btn = gr.Button("Delete ALL", variant="stop")
 
                 # Event handlers
                 ann_load_btn.click(
@@ -727,52 +727,52 @@ def create_app():
                 )
 
             # ----------------------------------------------------------------
-            # TAB: INFORMACIÓN
+            # TAB: INFO
             # ----------------------------------------------------------------
             with gr.TabItem("Info", id="info"):
                 gr.Markdown("""
-## Acerca del Proyecto
+## About the Project
 
-**VR Pillar Detector** es un modelo de detección de objetos especializado en identificar
-pilares de señalización amarillo/negro en entornos de Realidad Virtual.
+**VR Pillar Detector** is an object detection model specialized in identifying
+yellow/black signaling pillars in Virtual Reality environments.
 
-### Características
+### Features
 
-- **Modelo:** YOLOv12s fine-tuned
-- **Dataset:** 760 imágenes anotadas manualmente
-- **Precisión:** 98.7% mAP@50
-- **Velocidad:** 180 FPS con TensorRT FP16
+- **Model:** YOLOv12s fine-tuned
+- **Dataset:** 760 manually annotated images
+- **Precision:** 98.7% mAP@50
+- **Speed:** 180 FPS with TensorRT FP16
 
-### Hardware Recomendado
+### Recommended Hardware
 
-- GPU NVIDIA con CUDA (RTX 2060 o superior)
-- 6GB+ VRAM para entrenamiento
-- 2GB+ VRAM para inferencia
+- NVIDIA GPU with CUDA (RTX 2060 or higher)
+- 6GB+ VRAM for training
+- 2GB+ VRAM for inference
 
-### Uso por CLI
+### CLI Usage
 
 ```bash
-# Inferencia en imagen
-python scripts/inference.py --source imagen.jpg
+# Image inference
+python scripts/inference.py --source image.jpg
 
-# Inferencia en video
+# Video inference
 python scripts/inference.py --source video.mp4 --model models/best.engine
 
-# Entrenamiento
+# Training
 python scripts/train.py
 
 # Benchmark
 python scripts/benchmark.py
 ```
 
-### Enlaces
+### Links
 
 - [Ultralytics YOLO](https://docs.ultralytics.com/)
 - [YOLOv12](https://docs.ultralytics.com/models/yolo12/)
                 """)
 
         gr.Markdown("---")
-        gr.Markdown("*Desarrollado con Ultralytics YOLO y Gradio*")
+        gr.Markdown("*Developed with Ultralytics YOLO and Gradio*")
 
     return app
 
@@ -784,9 +784,9 @@ python scripts/benchmark.py
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="VR Pillar Detector - Interfaz Web")
-    parser.add_argument("--share", action="store_true", help="Crear enlace público")
-    parser.add_argument("--port", type=int, default=7860, help="Puerto (default: 7860)")
+    parser = argparse.ArgumentParser(description="VR Pillar Detector - Web Interface")
+    parser.add_argument("--share", action="store_true", help="Create public link")
+    parser.add_argument("--port", type=int, default=7860, help="Port (default: 7860)")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host (default: 127.0.0.1)")
     args = parser.parse_args()
 
