@@ -15,6 +15,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+import cv2
 import gradio as gr
 import numpy as np
 from PIL import Image
@@ -331,6 +332,174 @@ def get_training_status():
 
 
 # ============================================================================
+# TAB: ANOTACIONES
+# ============================================================================
+
+class AnnotationReviewer:
+    """Revisor de anotaciones para Gradio."""
+
+    def __init__(self):
+        self.images_dir = None
+        self.labels_dir = None
+        self.image_files = []
+        self.current_idx = 0
+        self.annotations = []
+
+    def load_dataset(self, dataset_path: str):
+        """Carga un dataset para revisar."""
+        dataset_path = Path(dataset_path) if dataset_path else DATA_DIR / "dataset" / "train"
+
+        self.images_dir = dataset_path / "images"
+        self.labels_dir = dataset_path / "labels"
+
+        if not self.images_dir.exists():
+            return None, f"No se encontró: {self.images_dir}", "0 / 0"
+
+        self.image_files = sorted(self.images_dir.glob("*.jpg"))
+        if not self.image_files:
+            self.image_files = sorted(self.images_dir.glob("*.png"))
+
+        if not self.image_files:
+            return None, "No se encontraron imágenes", "0 / 0"
+
+        self.current_idx = 0
+        return self._load_current()
+
+    def _load_current(self):
+        """Carga la imagen y anotaciones actuales."""
+        if not self.image_files:
+            return None, "No hay imágenes", "0 / 0"
+
+        img_path = self.image_files[self.current_idx]
+        label_path = self.labels_dir / f"{img_path.stem}.txt"
+
+        # Cargar imagen
+        img = cv2.imread(str(img_path))
+        if img is None:
+            return None, f"Error cargando: {img_path.name}", f"{self.current_idx + 1} / {len(self.image_files)}"
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        h, w = img.shape[:2]
+
+        # Cargar anotaciones
+        self.annotations = []
+        if label_path.exists():
+            with open(label_path, 'r') as f:
+                for i, line in enumerate(f):
+                    parts = line.strip().split()
+                    if len(parts) >= 5:
+                        self.annotations.append({
+                            'id': i,
+                            'cls': int(parts[0]),
+                            'x': float(parts[1]),
+                            'y': float(parts[2]),
+                            'w': float(parts[3]),
+                            'h': float(parts[4])
+                        })
+
+        # Dibujar anotaciones
+        img_display = img.copy()
+        for ann in self.annotations:
+            cx, cy = int(ann['x'] * w), int(ann['y'] * h)
+            bw, bh = int(ann['w'] * w), int(ann['h'] * h)
+            x1, y1 = cx - bw // 2, cy - bh // 2
+            x2, y2 = cx + bw // 2, cy + bh // 2
+
+            cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(img_display, str(ann['id']), (x1, y1 - 5),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+        info = f"**{img_path.name}** - {len(self.annotations)} anotaciones"
+        counter = f"{self.current_idx + 1} / {len(self.image_files)}"
+
+        return img_display, info, counter
+
+    def next_image(self):
+        """Siguiente imagen."""
+        if self.image_files and self.current_idx < len(self.image_files) - 1:
+            self.current_idx += 1
+        return self._load_current()
+
+    def prev_image(self):
+        """Imagen anterior."""
+        if self.image_files and self.current_idx > 0:
+            self.current_idx -= 1
+        return self._load_current()
+
+    def goto_image(self, idx: int):
+        """Ir a imagen específica."""
+        if self.image_files and 0 <= idx - 1 < len(self.image_files):
+            self.current_idx = idx - 1
+        return self._load_current()
+
+    def delete_annotation(self, ann_id: int):
+        """Elimina una anotación y guarda."""
+        if not self.image_files:
+            return self._load_current()
+
+        # Filtrar anotación
+        self.annotations = [a for a in self.annotations if a['id'] != ann_id]
+
+        # Guardar
+        img_path = self.image_files[self.current_idx]
+        label_path = self.labels_dir / f"{img_path.stem}.txt"
+
+        with open(label_path, 'w') as f:
+            for ann in self.annotations:
+                f.write(f"{ann['cls']} {ann['x']:.6f} {ann['y']:.6f} {ann['w']:.6f} {ann['h']:.6f}\n")
+
+        return self._load_current()
+
+    def delete_all_annotations(self):
+        """Elimina todas las anotaciones de la imagen actual."""
+        if not self.image_files:
+            return self._load_current()
+
+        self.annotations = []
+
+        img_path = self.image_files[self.current_idx]
+        label_path = self.labels_dir / f"{img_path.stem}.txt"
+
+        with open(label_path, 'w') as f:
+            pass  # Archivo vacío
+
+        return self._load_current()
+
+
+# Instancia global del revisor
+annotation_reviewer = AnnotationReviewer()
+
+
+def load_annotations_dataset(dataset_choice):
+    """Wrapper para cargar dataset."""
+    if dataset_choice == "Train":
+        path = DATA_DIR / "dataset" / "train"
+    else:
+        path = DATA_DIR / "dataset" / "val"
+    return annotation_reviewer.load_dataset(str(path))
+
+
+def annotations_next():
+    return annotation_reviewer.next_image()
+
+
+def annotations_prev():
+    return annotation_reviewer.prev_image()
+
+
+def annotations_goto(idx):
+    return annotation_reviewer.goto_image(int(idx))
+
+
+def annotations_delete(ann_id):
+    return annotation_reviewer.delete_annotation(int(ann_id))
+
+
+def annotations_delete_all():
+    return annotation_reviewer.delete_all_annotations()
+
+
+# ============================================================================
 # INTERFAZ GRADIO
 # ============================================================================
 
@@ -490,6 +659,71 @@ def create_app():
                     start_training,
                     inputs=[train_epochs, train_batch, train_model],
                     outputs=[train_output]
+                )
+
+            # ----------------------------------------------------------------
+            # TAB: ANOTACIONES
+            # ----------------------------------------------------------------
+            with gr.TabItem("Anotaciones", id="annotations"):
+                gr.Markdown("## Revisor de Anotaciones")
+                gr.Markdown("Revisa y edita las anotaciones del dataset.")
+
+                with gr.Row():
+                    ann_dataset = gr.Radio(
+                        choices=["Train", "Val"],
+                        value="Train",
+                        label="Dataset"
+                    )
+                    ann_load_btn = gr.Button("Cargar Dataset", variant="primary")
+
+                with gr.Row():
+                    with gr.Column(scale=3):
+                        ann_image = gr.Image(label="Imagen con anotaciones")
+
+                    with gr.Column(scale=1):
+                        ann_info = gr.Markdown("Selecciona un dataset")
+                        ann_counter = gr.Textbox(label="Progreso", value="0 / 0", interactive=False)
+
+                        with gr.Row():
+                            ann_prev_btn = gr.Button("< Anterior")
+                            ann_next_btn = gr.Button("Siguiente >")
+
+                        ann_goto = gr.Number(label="Ir a imagen #", value=1, precision=0)
+                        ann_goto_btn = gr.Button("Ir")
+
+                        gr.Markdown("---")
+                        gr.Markdown("### Eliminar anotaciones")
+                        ann_delete_id = gr.Number(label="ID de anotación", value=0, precision=0)
+                        ann_delete_btn = gr.Button("Eliminar anotacion", variant="secondary")
+                        ann_delete_all_btn = gr.Button("Eliminar TODAS", variant="stop")
+
+                # Event handlers
+                ann_load_btn.click(
+                    load_annotations_dataset,
+                    inputs=[ann_dataset],
+                    outputs=[ann_image, ann_info, ann_counter]
+                )
+                ann_next_btn.click(
+                    annotations_next,
+                    outputs=[ann_image, ann_info, ann_counter]
+                )
+                ann_prev_btn.click(
+                    annotations_prev,
+                    outputs=[ann_image, ann_info, ann_counter]
+                )
+                ann_goto_btn.click(
+                    annotations_goto,
+                    inputs=[ann_goto],
+                    outputs=[ann_image, ann_info, ann_counter]
+                )
+                ann_delete_btn.click(
+                    annotations_delete,
+                    inputs=[ann_delete_id],
+                    outputs=[ann_image, ann_info, ann_counter]
+                )
+                ann_delete_all_btn.click(
+                    annotations_delete_all,
+                    outputs=[ann_image, ann_info, ann_counter]
                 )
 
             # ----------------------------------------------------------------
