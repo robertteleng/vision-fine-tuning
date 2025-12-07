@@ -26,6 +26,7 @@ DIST_FILES = [
     # Windows scripts
     ("dist/install.bat", "install.bat"),
     ("dist/run.bat", "run.bat"),
+    ("dist/README.md", "README.md"),
 
     # Data config
     ("data/pillar.yaml", "data/pillar.yaml"),
