@@ -329,8 +329,8 @@ Ejemplos de uso:
     parser.add_argument(
         '--conf',
         type=float,
-        default=0.25,
-        help='Umbral de confianza mínimo (default: 0.25)'
+        default=0.65,
+        help='Umbral de confianza mínimo (default: 0.65)'
     )
 
     parser.add_argument(

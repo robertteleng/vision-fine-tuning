@@ -1,73 +1,54 @@
-# Fine-Tuning YOLOv8/v11 para Detección de Cajas VR
+# Fine-Tuning YOLO12 para Detección de Pilares VR
 
 ## Objetivo del Proyecto
 
-Este proyecto implementa un modelo de detección de objetos especializado en identificar **cajas de experiencias de Realidad Virtual (VR)** en capturas de pantalla. El modelo está optimizado para detectar dos clases específicas de cajas que aparecen en la interfaz de una aplicación VR.
+Modelo de detección de objetos especializado en identificar **pilares de señalización amarillo/negro** en entornos de Realidad Virtual. El modelo está optimizado para tiempo real usando YOLOv12s.
 
-### ¿Por qué Fine-Tuning en lugar de Zero-Shot?
+## Resultados Actuales
 
-| Aspecto | Zero-Shot (Ej: CLIP, Grounding DINO) | Fine-Tuning (YOLOv8/v11) |
-|---------|--------------------------------------|--------------------------|
-| **Clases** | Abiertas, cualquier texto | Fijas, predefinidas |
-| **Precisión** | ~70-85% en objetos comunes | >95% en clases específicas |
-| **Velocidad** | Más lento (modelos grandes) | Muy rápido (~2-5ms/imagen) |
-| **Consistencia** | Variable según el prompt | Altamente consistente |
-| **Uso en producción** | Requiere más recursos | Ligero y eficiente |
-
-**Decisión**: Para nuestro caso de uso con **exactamente 2 clases fijas** de cajas VR, el fine-tuning ofrece:
-- ✅ Máxima precisión posible
-- ✅ Inferencia ultra-rápida
-- ✅ Modelo pequeño (~6MB con YOLOv8n)
-- ✅ Funcionamiento offline
-- ✅ Resultados reproducibles
+| Métrica | Valor |
+|---------|-------|
+| mAP@50 | 98.7% |
+| mAP@50-95 | 87.4% |
+| Precisión | 91.7% |
+| Recall | 99.2% |
+| Inferencia | 3.5ms/imagen |
 
 ---
 
-## Especificaciones de Hardware
+## Hardware
 
-### Configuración Actual
 | Componente | Especificación |
 |------------|----------------|
 | GPU | NVIDIA RTX 2060 (6GB VRAM) |
-| Limitaciones | Batch size máximo: 8-16 |
-| Tiempo estimado/época | ~2-5 min (depende del dataset) |
-
-### Configuración Futura (en ~2 semanas)
-| Componente | Especificación |
-|------------|----------------|
-| GPU | NVIDIA RTX 5060 Ti (16GB VRAM esperada) |
-| Mejoras esperadas | Batch size: 32-64, ~2-3x más rápido |
-
-> **Nota**: Ver [docs/benchmarks.md](docs/benchmarks.md) para comparativa de rendimiento.
+| CUDA | 13.0 |
+| Driver | 580.95.05 |
 
 ---
 
 ## Estructura del Proyecto
 
 ```
-fine_tuning_cajas_vr/
-├── README.md                    # Este archivo
-├── requirements.txt             # Dependencias Python
+fine-tuning-vr/
 ├── config.yaml                  # Configuración de entrenamiento
-├── data/                        # Dataset (exportado de Roboflow)
-│   ├── train/
-│   │   ├── images/             # Imágenes de entrenamiento
-│   │   └── labels/             # Anotaciones YOLO format (.txt)
-│   ├── valid/
-│   │   ├── images/
-│   │   └── labels/
-│   └── test/
-│       ├── images/
-│       └── labels/
+├── data/
+│   ├── dataset/                 # Dataset principal
+│   │   ├── train/images/        # 562 imágenes
+│   │   ├── train/labels/        # Anotaciones YOLO
+│   │   ├── val/images/
+│   │   └── val/labels/
+│   ├── pillar.yaml              # Config dataset YOLO
+│   ├── video.mp4                # Video de prueba
+│   ├── video_frames/            # Frames extraídos
+│   └── templates/               # Templates para auto-anotación
 ├── scripts/
-│   ├── train.py                # Script de entrenamiento
-│   └── inference.py            # Script de inferencia
-├── notebooks/
-│   └── 01_data_exploration.ipynb  # Exploración del dataset
-├── docs/
-│   └── benchmarks.md           # Métricas y comparativas
-├── models/                     # Modelos entrenados guardados
-└── runs/                       # Logs de entrenamiento (TensorBoard)
+│   ├── train.py                 # Entrenamiento completo
+│   ├── inference.py             # Inferencia (imagen/video/webcam)
+│   ├── auto_annotate.py         # Auto-anotación con template matching
+│   ├── visualize_annotations.py # Visualizar anotaciones
+│   └── split_dataset.py         # Dividir train/val
+├── models/                      # Modelos guardados con versionado
+└── runs/                        # Logs de entrenamiento
 ```
 
 ---
@@ -75,337 +56,236 @@ fine_tuning_cajas_vr/
 ## Instalación
 
 ```bash
-# 1. Crear entorno virtual (recomendado)
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# o: venv\Scripts\activate  # Windows
+# Crear entorno virtual
+python3 -m venv .venv
+source .venv/bin/activate
 
-# 2. Instalar dependencias
+# Instalar dependencias
 pip install -r requirements.txt
 
-# 3. Verificar instalación de CUDA
-python -c "import torch; print(f'CUDA disponible: {torch.cuda.is_available()}')"
-python -c "import torch; print(f'GPU: {torch.cuda.get_device_name(0)}')"
+# Verificar CUDA
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 ```
 
 ---
 
-## Guía Paso a Paso
+## Uso
 
-### 1. Captura de Screenshots VR
-
-Para crear un dataset de calidad, sigue estas recomendaciones:
-
-#### Método de Captura
-```
-1. Abre la aplicación VR en modo escritorio (si es posible)
-2. Usa herramientas de captura:
-   - Windows: Win + Shift + S (Snipping Tool)
-   - OBS Studio: Para capturas consistentes
-   - NVIDIA ShadowPlay: Alt + F1
-
-3. Captura variedad de escenas:
-   - Diferentes posiciones de las cajas
-   - Diferentes fondos/contextos
-   - Diferentes tamaños de caja en pantalla
-   - Con y sin oclusiones parciales
-```
-
-#### Recomendaciones de Cantidad
-| Fase | Imágenes por clase | Total mínimo |
-|------|-------------------|--------------|
-| MVP/Prueba | 50-100 | 100-200 |
-| Producción básica | 200-500 | 400-1000 |
-| Alta precisión | 500-1000+ | 1000-2000+ |
-
-#### Tips para Mejores Resultados
-- ✅ Incluir variaciones de iluminación
-- ✅ Capturar cajas en diferentes escalas
-- ✅ Incluir casos "difíciles" (parcialmente visibles)
-- ✅ Mantener resolución consistente (ej: 1920x1080)
-- ❌ Evitar imágenes borrosas o de baja calidad
-- ❌ Evitar demasiadas imágenes casi idénticas
-
----
-
-### 2. Anotación con Roboflow
-
-#### Crear Proyecto en Roboflow
-
-1. **Ir a [roboflow.com](https://roboflow.com)** y crear cuenta gratuita
-
-2. **Crear nuevo proyecto**:
-   - Project Type: `Object Detection`
-   - Project Name: `vr-boxes-detection`
-   - License: Tu preferencia
-   - Annotation Group: `vr_boxes`
-
-3. **Definir clases** (ajusta según tus cajas específicas):
-   ```
-   Clase 0: vr_box_type_a    # Ejemplo: Caja de experiencia principal
-   Clase 1: vr_box_type_b    # Ejemplo: Caja de menú/navegación
-   ```
-
-#### Proceso de Anotación
-
-```
-1. Subir imágenes:
-   - Drag & drop las capturas
-   - Roboflow detectará duplicados automáticamente
-
-2. Anotar cada imagen:
-   - Usar herramienta de bounding box
-   - Dibujar rectángulo alrededor de cada caja
-   - Asignar la clase correcta
-   - Asegurar que el box cubra toda la caja
-
-3. Tips de anotación:
-   - Ser consistente en los bordes
-   - No dejar espacio extra innecesario
-   - Anotar TODAS las instancias visibles
-   - Marcar como "null" imágenes sin objetos
-```
-
-#### Generar Dataset
-
-```
-1. Ir a "Generate" en el proyecto
-
-2. Configurar preprocessing:
-   - Auto-Orient: ON
-   - Resize: 640x640 (estándar YOLO)
-
-3. Configurar augmentation (OPCIONAL para datasets pequeños):
-   - Flip: Horizontal
-   - Rotation: ±15°
-   - Brightness: ±15%
-   - (No exceder, YOLO hace augmentation interno)
-
-4. Split del dataset:
-   - Train: 70%
-   - Valid: 20%
-   - Test: 10%
-
-5. Generar nueva versión
-```
-
----
-
-### 3. Exportar y Colocar Archivos
-
-#### Exportar desde Roboflow
-
-```
-1. En tu dataset generado, click "Export"
-
-2. Seleccionar formato:
-   ⭐ "YOLOv8" (formato nativo, recomendado)
-
-3. Método de descarga:
-   - "Download zip" para descarga manual
-   - O usar código Python (más conveniente):
-```
-
-```python
-# Código de exportación (Roboflow te lo genera)
-from roboflow import Roboflow
-
-rf = Roboflow(api_key="TU_API_KEY")
-project = rf.workspace("tu-workspace").project("vr-boxes-detection")
-dataset = project.version(1).download("yolov8")
-```
-
-#### Estructura Esperada del Export
-
-```
-vr-boxes-detection-1/
-├── data.yaml           # Configuración del dataset
-├── train/
-│   ├── images/
-│   │   ├── img001.jpg
-│   │   └── ...
-│   └── labels/
-│       ├── img001.txt  # Formato: class x_center y_center width height
-│       └── ...
-├── valid/
-│   ├── images/
-│   └── labels/
-└── test/
-    ├── images/
-    └── labels/
-```
-
-#### Colocar en el Proyecto
+### Entrenamiento
 
 ```bash
-# Opción 1: Copiar contenido a carpeta data/
-cp -r vr-boxes-detection-1/train/* fine_tuning_cajas_vr/data/train/
-cp -r vr-boxes-detection-1/valid/* fine_tuning_cajas_vr/data/valid/
-cp -r vr-boxes-detection-1/test/* fine_tuning_cajas_vr/data/test/
-
-# Opción 2: Modificar config.yaml para apuntar a la carpeta descargada
-# (ver config.yaml para instrucciones)
-```
-
----
-
-### 4. Entrenamiento
-
-```bash
-# Entrenar el modelo
-cd fine_tuning_cajas_vr
+source .venv/bin/activate
 python scripts/train.py
+```
 
-# Monitorear con TensorBoard (opcional, en otra terminal)
-tensorboard --logdir runs/
+Configuración en `config.yaml`:
+- `epochs`: Número de épocas (30-100 recomendado)
+- `batch`: Tamaño de batch (8 para RTX 2060)
+- `model`: Modelo base (`yolo12s.pt`)
+
+### Inferencia
+
+```bash
+# Imagen
+python scripts/inference.py --source imagen.jpg
+
+# Video
+python scripts/inference.py --source video.mp4
+
+# Webcam
+python scripts/inference.py --source 0 --show
+
+# Ajustar confianza
+python scripts/inference.py --source video.mp4 --conf 0.5
 ```
 
 ---
 
-### 5. Inferencia
+## Pipeline de Anotación
 
-```bash
-# Probar en una imagen
-python scripts/inference.py --source path/to/image.jpg
-
-# Probar en un directorio
-python scripts/inference.py --source path/to/images/
-
-# Probar en video
-python scripts/inference.py --source path/to/video.mp4
-```
-
----
-
-## Checklist de Upgrade GPU (RTX 2060 → RTX 5060 Ti)
-
-Cuando actualices a la RTX 5060 Ti, sigue estos pasos:
-
-### Parámetros a Ajustar
-
-| Parámetro | RTX 2060 (6GB) | RTX 5060 Ti (16GB) | Archivo |
-|-----------|----------------|-------------------|---------|
-| `batch` | 8 | 32 (o 64) | config.yaml |
-| `workers` | 4 | 8-12 | config.yaml |
-| `imgsz` | 640 | 640 (o 1280) | config.yaml |
-| `cache` | False/ram | ram | config.yaml |
-
-### Procedimiento de Upgrade
-
-```bash
-# 1. Actualizar drivers NVIDIA
-# Descargar de: https://www.nvidia.com/drivers
-
-# 2. Verificar nueva GPU
-nvidia-smi
-python -c "import torch; print(torch.cuda.get_device_name(0))"
-
-# 3. Actualizar config.yaml
-# Cambiar batch: 8 → batch: 32
-# Cambiar workers: 4 → workers: 8
-
-# 4. (Opcional) Re-instalar PyTorch para CUDA más reciente
-pip install torch torchvision --upgrade --index-url https://download.pytorch.org/whl/cu124
-
-# 5. Ejecutar benchmark
-python scripts/train.py --epochs 1  # Prueba rápida
-
-# 6. Documentar resultados en docs/benchmarks.md
-```
-
-### Verificación Post-Upgrade
+### 1. Extraer frames de video
 
 ```python
-# Script de verificación
-import torch
+import cv2
+from pathlib import Path
 
-print(f"PyTorch version: {torch.__version__}")
-print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"CUDA version: {torch.version.cuda}")
-print(f"GPU: {torch.cuda.get_device_name(0)}")
-print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+video = cv2.VideoCapture('data/video.mp4')
+fps = video.get(cv2.CAP_PROP_FPS)
+frame_num = 0
+saved = 0
+
+while True:
+    ret, frame = video.read()
+    if not ret:
+        break
+    if frame_num % int(fps) == 0:  # 1 frame por segundo
+        cv2.imwrite(f'data/frames/frame_{saved:04d}.jpg', frame)
+        saved += 1
+    frame_num += 1
+video.release()
+```
+
+### 2. Auto-anotación con template matching
+
+```bash
+python scripts/auto_annotate.py \
+  --frames data/frames/ \
+  --template data/templates/pillar.jpg \
+  --output data/labels/ \
+  --threshold 0.7
+```
+
+**Limitaciones encontradas:**
+- Template matching funciona bien con objetos distintivos
+- Para patrones repetitivos (tablero amarillo/negro), genera falsos positivos
+- Threshold 0.85-0.95 reduce falsos positivos pero puede perder detecciones
+
+### 3. Anotación manual (cuando template matching falla)
+
+Usamos **makesense.ai** (web, gratis):
+1. Subir imágenes
+2. Crear clase "pillar"
+3. Dibujar bounding boxes
+4. Exportar en formato YOLO
+
+**Problema encontrado:** LabelImg crashea en Python 3.12 con PyQt5. Makesense.ai es la alternativa más estable.
+
+### 4. Visualizar anotaciones
+
+```bash
+python scripts/visualize_annotations.py \
+  --images data/frames/ \
+  --labels data/labels/ \
+  --output data/viz/ \
+  --sample 10
 ```
 
 ---
 
-## Decisiones Técnicas
+## Problemas Encontrados y Soluciones
 
-### Modelo Base: YOLOv8n vs YOLOv11n
+### 1. Template matching con falsos positivos
 
-| Aspecto | YOLOv8n | YOLOv11n |
-|---------|---------|----------|
-| Madurez | Muy estable, amplia documentación | Más reciente, mejoras incrementales |
-| Velocidad | ~2ms/imagen | ~1.8ms/imagen |
-| Precisión | Excelente | Ligeramente mejor |
-| Tamaño | 6.3 MB | 5.4 MB |
-| **Recomendación** | ✅ Para producción estable | ✅ Para mejor rendimiento |
+**Problema:** El patrón de tablero amarillo/negro es muy repetitivo, generando muchas detecciones falsas.
 
-**Decisión actual**: Usar `yolov8n.pt` por estabilidad. Cambiar a `yolov11n.pt` es trivial si se desea.
+**Solución:**
+- Aumentar threshold a 0.85-0.95
+- Para pilares con patrón diferente (invertido), anotar manualmente
+- Separar frames por tipo de pilar y procesar por separado
 
-### Hiperparámetros Elegidos
+### 2. LabelImg crashea en Ubuntu/Python 3.12
 
-Ver [config.yaml](config.yaml) para todos los parámetros con explicaciones detalladas.
+**Error:** `TypeError: drawLine(): argument 1 has unexpected type 'float'`
+
+**Causa:** Bug conocido de LabelImg con PyQt5 en Python 3.12
+
+**Solución:** Usar makesense.ai (web) en su lugar
+
+### 3. Pilares con patrón invertido no detectados
+
+**Problema:** El modelo entrenado solo con pilares "amarillo arriba" no detecta pilares "negro arriba"
+
+**Solución:**
+1. Identificar frames con pilares invertidos (282-391)
+2. Crear template específico para patrón invertido
+3. Auto-anotar esos frames
+4. Re-entrenar con datos ampliados
+
+### 4. Dataset con anotaciones vacías
+
+**Problema:** 92 imágenes tenían archivos .txt pero vacíos (sin anotaciones)
+
+**Diagnóstico:**
+```bash
+wc -l data/dataset/train/labels/frame_000300.txt
+# Output: 0  (vacío)
+```
+
+**Solución:** Re-anotar esos frames específicos
+
+### 5. Entorno virtual desaparece
+
+**Problema:** El .venv dejó de funcionar misteriosamente
+
+**Solución:** Recrear:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 6. SSH sin display gráfico
+
+**Problema:** `--show` no funciona por SSH
+
+**Solución:**
+- El video se guarda en `runs/inference/`
+- Descargar con `scp` o usar `ssh -X` para X11 forwarding
 
 ---
 
-## Resultados
+## Historial de Entrenamientos
 
-> **TODO**: Completar después del primer entrenamiento
+### Entrenamiento 1: YOLOv8n, 10 épocas
+- Dataset: Solo pilares normales
+- Resultado: mAP50-95 = 62.7%
 
-| Métrica | Valor |
-|---------|-------|
-| mAP@50 | - |
-| mAP@50-95 | - |
-| Precisión | - |
-| Recall | - |
-| Tiempo/imagen | - |
+### Entrenamiento 2: YOLOv12s, 50 épocas
+- Dataset: Solo pilares normales
+- Resultado: mAP50-95 = 84.7%
+- **Mejora significativa**
 
-Ver [docs/benchmarks.md](docs/benchmarks.md) para historial completo.
+### Entrenamiento 3: YOLOv12s, 100 épocas
+- Dataset: + 7 frames con pilares invertidos (manual)
+- Resultado: mAP50-95 = 87.4%
+- Los pilares invertidos siguen sin detectarse (pocos ejemplos)
+
+### Entrenamiento 4: YOLOv12s, 30 épocas (en curso)
+- Dataset: + 92 frames con pilares invertidos (auto-anotados)
+- Objetivo: Detectar ambos tipos de pilares
 
 ---
 
-## Troubleshooting
+## Comparativa YOLO8 vs YOLO12
 
-### Error: CUDA out of memory
-```bash
-# Reducir batch size en config.yaml
-batch: 4  # En lugar de 8
-```
+| Métrica | YOLOv8n (10 ep) | YOLOv12s (50 ep) |
+|---------|-----------------|------------------|
+| Precision | 90.4% | 93.3% |
+| Recall | 93.0% | 97.5% |
+| mAP50 | 96.4% | 97.9% |
+| mAP50-95 | 62.7% | 84.7% |
 
-### Error: No module named 'ultralytics'
-```bash
-pip install ultralytics
-```
+**Conclusión:** YOLOv12s con más épocas mejora significativamente la localización (mAP50-95).
 
-### Entrenamiento muy lento
-```bash
-# Verificar que CUDA está activo
-python -c "import torch; print(torch.cuda.is_available())"  # Debe ser True
+---
 
-# Si es False, reinstalar PyTorch con CUDA
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-```
+## Recursos de GPU (RTX 2060)
 
-### Las predicciones son malas
-1. Verificar calidad de anotaciones en notebook de exploración
-2. Aumentar número de épocas
-3. Agregar más datos de entrenamiento
-4. Verificar que no hay data leakage (imágenes repetidas en train/valid)
+| Operación | VRAM | Potencia |
+|-----------|------|----------|
+| Idle | ~400MB | ~10W |
+| Entrenamiento | ~3.5GB | ~115W |
+| Inferencia | ~1.5GB | ~50W |
+
+Temperatura típica durante entrenamiento: 65-70°C
+
+---
+
+## Próximos Pasos
+
+- [ ] Verificar detección de pilares invertidos tras entrenamiento 4
+- [ ] Exportar modelo a TensorRT para inferencia más rápida
+- [ ] Crear script de benchmark comparativo
+- [ ] Probar con más videos de prueba
 
 ---
 
 ## Referencias
 
-- [Documentación Ultralytics YOLOv8](https://docs.ultralytics.com/)
-- [Roboflow - Guía de Anotación](https://docs.roboflow.com/)
-- [YOLOv8 Paper](https://arxiv.org/abs/2305.09972)
-- [Tips de Fine-Tuning](https://docs.ultralytics.com/guides/model-training-tips/)
-
----
-
-## Licencia
-
-Este proyecto es para uso interno/educativo. El modelo base YOLOv8 está bajo licencia AGPL-3.0.
+- [Ultralytics YOLO](https://docs.ultralytics.com/)
+- [YOLOv12](https://docs.ultralytics.com/models/yolo12/)
+- [makesense.ai](https://www.makesense.ai/) - Anotación web gratuita
+- [Formato YOLO](https://docs.ultralytics.com/datasets/detect/)
 
 ---
 

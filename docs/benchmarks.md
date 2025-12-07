@@ -1,15 +1,6 @@
 # Benchmarks y Métricas de Entrenamiento
 
-Este documento registra las métricas de entrenamiento y comparativas de rendimiento entre diferentes configuraciones de hardware y modelos.
-
----
-
-## Tabla de Contenidos
-
-1. [Métricas de Referencia](#métricas-de-referencia)
-2. [Historial de Entrenamientos](#historial-de-entrenamientos)
-3. [Comparativa RTX 2060 vs RTX 5060 Ti](#comparativa-rtx-2060-vs-rtx-5060-ti)
-4. [Mejores Configuraciones](#mejores-configuraciones)
+Este documento registra las métricas de entrenamiento y comparativas de rendimiento.
 
 ---
 
@@ -23,246 +14,185 @@ Este documento registra las métricas de entrenamiento y comparativas de rendimi
 | **mAP@50-95** | mAP promediando IoUs de 0.5 a 0.95 | > 0.70 |
 | **Precision** | Detecciones correctas / Total detecciones | > 0.90 |
 | **Recall** | Detecciones correctas / Total objetos reales | > 0.85 |
-| **F1-Score** | Media armónica de Precision y Recall | > 0.87 |
-
-### Velocidad de Inferencia
-
-| Métrica | RTX 2060 Target | RTX 5060 Ti Target |
-|---------|-----------------|-------------------|
-| Tiempo/imagen | < 10ms | < 5ms |
-| FPS | > 100 | > 200 |
 
 ---
 
 ## Historial de Entrenamientos
 
-### Plantilla para Registrar Entrenamiento
-
-```
-## Entrenamiento: [FECHA] - [NOMBRE_EXPERIMENTO]
-
-### Configuración
-- **Modelo base**: yolov8n.pt / yolov11n.pt
-- **GPU**: RTX 2060 / RTX 5060 Ti
-- **Batch size**: X
-- **Image size**: 640 / 1280
-- **Épocas**: X (early stop en Y)
-- **Dataset**: X train / Y valid / Z test
-
-### Métricas Finales
-| Clase | Precision | Recall | mAP@50 | mAP@50-95 |
-|-------|-----------|--------|--------|-----------|
-| vr_box_type_a | - | - | - | - |
-| vr_box_type_b | - | - | - | - |
-| **Total** | - | - | - | - |
-
-### Tiempos
-- Tiempo total: Xh Ym
-- Tiempo por época: ~Xm
-- Inferencia: Xms/imagen
-
-### Observaciones
-- [Notas sobre el entrenamiento]
-- [Problemas encontrados]
-- [Mejoras para siguiente iteración]
-```
-
----
-
-## Entrenamientos Registrados
-
-### Entrenamiento: [PENDIENTE] - Baseline RTX 2060
-
-> **TODO**: Completar después del primer entrenamiento
+### Entrenamiento 1: 2024-12-07 - YOLOv8n Baseline
 
 #### Configuración
 - **Modelo base**: yolov8n.pt
 - **GPU**: NVIDIA RTX 2060 (6GB VRAM)
 - **Batch size**: 8
 - **Image size**: 640
-- **Épocas**: 100 (patience: 20)
-- **Dataset**: - train / - valid / - test
+- **Épocas**: 10
+- **Dataset**: 555 train / 139 val
 
 #### Métricas Finales
-| Clase | Precision | Recall | mAP@50 | mAP@50-95 |
-|-------|-----------|--------|--------|-----------|
-| vr_box_type_a | - | - | - | - |
-| vr_box_type_b | - | - | - | - |
-| **Total** | - | - | - | - |
+| Métrica | Valor |
+|---------|-------|
+| Precision | 90.4% |
+| Recall | 93.0% |
+| mAP@50 | 96.4% |
+| mAP@50-95 | 62.7% |
 
 #### Tiempos
-- Tiempo total: -
-- Tiempo por época: -
-- Inferencia: -
+- Tiempo total: ~3 min
+- Tiempo por época: ~18s
+- Inferencia: ~5ms/imagen
 
 #### Observaciones
 - Primer entrenamiento de baseline
-- [Agregar observaciones post-entrenamiento]
+- Solo pilares normales (amarillo arriba)
+- mAP50-95 bajo indica localización imprecisa
 
 ---
 
-### Entrenamiento: [PENDIENTE] - Post-Upgrade RTX 5060 Ti
-
-> **TODO**: Completar después de recibir la RTX 5060 Ti
+### Entrenamiento 2: 2024-12-07 - YOLOv12s 50 épocas
 
 #### Configuración
-- **Modelo base**: yolov8n.pt / yolov11n.pt
-- **GPU**: NVIDIA RTX 5060 Ti (16GB VRAM)
-- **Batch size**: 32
+- **Modelo base**: yolo12s.pt
+- **GPU**: NVIDIA RTX 2060 (6GB VRAM)
+- **Batch size**: 8
 - **Image size**: 640
-- **Épocas**: 100
-- **Dataset**: - train / - valid / - test
+- **Épocas**: 50
+- **Dataset**: 555 train / 139 val
 
 #### Métricas Finales
-| Clase | Precision | Recall | mAP@50 | mAP@50-95 |
-|-------|-----------|--------|--------|-----------|
-| vr_box_type_a | - | - | - | - |
-| vr_box_type_b | - | - | - | - |
-| **Total** | - | - | - | - |
+| Métrica | Valor |
+|---------|-------|
+| Precision | 93.3% |
+| Recall | 97.5% |
+| mAP@50 | 97.9% |
+| mAP@50-95 | 84.7% |
 
 #### Tiempos
-- Tiempo total: -
-- Tiempo por época: -
-- Inferencia: -
+- Tiempo total: ~15 min
+- Tiempo por época: ~18s
+- Inferencia: ~4ms/imagen
 
 #### Observaciones
-- Comparar velocidad vs RTX 2060
-- [Agregar observaciones post-entrenamiento]
+- Mejora significativa en mAP50-95 (+22 puntos)
+- YOLOv12s mejor que YOLOv8n para este caso
+- Pilares invertidos siguen sin detectarse
 
 ---
 
-## Comparativa RTX 2060 vs RTX 5060 Ti
+### Entrenamiento 3: 2024-12-07 - YOLOv12s 100 épocas + 7 frames invertidos
 
-### Especificaciones de Hardware
+#### Configuración
+- **Modelo base**: yolo12s.pt
+- **GPU**: NVIDIA RTX 2060 (6GB VRAM)
+- **Batch size**: 8
+- **Image size**: 640
+- **Épocas**: 100
+- **Dataset**: 562 train / 139 val (+7 frames manuales)
 
-| Especificación | RTX 2060 | RTX 5060 Ti (Esperado) |
-|----------------|----------|------------------------|
-| VRAM | 6GB GDDR6 | 16GB GDDR7 (estimado) |
-| CUDA Cores | 1920 | ~5000+ (estimado) |
-| Tensor Cores | Gen 2 | Gen 5 (estimado) |
-| Arquitectura | Turing | Blackwell |
-| TDP | 160W | ~180W (estimado) |
+#### Métricas Finales
+| Métrica | Valor |
+|---------|-------|
+| Precision | 91.7% |
+| Recall | 99.2% |
+| mAP@50 | 98.7% |
+| mAP@50-95 | 87.4% |
 
-### Comparativa de Entrenamiento
+#### Tiempos
+- Tiempo total: ~24 min (0.4h)
+- Tiempo por época: ~14s
+- Inferencia: ~3.5ms/imagen
 
-| Parámetro | RTX 2060 | RTX 5060 Ti |
-|-----------|----------|-------------|
-| Batch size máximo | 8-16 | 32-64 |
-| Imgsz máximo | 640 | 640-1280 |
-| Workers óptimos | 4 | 8-12 |
-| Cache | False/disco | RAM |
-| Tiempo/época (estimado) | ~3-5 min | ~1-2 min |
-| **Speedup esperado** | 1x | ~2-3x |
-
-### Gráficos de Comparación
-
-> **TODO**: Agregar gráficos después de tener datos de ambas GPUs
-
-```
-Tiempo por época (minutos)
-RTX 2060:    ████████████████████ 5.0 min
-RTX 5060 Ti: ████████ 2.0 min (estimado)
-
-Batch size
-RTX 2060:    ████ 8
-RTX 5060 Ti: ████████████████ 32 (estimado)
-```
+#### Observaciones
+- 7 frames con pilares invertidos añadidos manualmente
+- No suficiente para aprender el nuevo patrón
+- El modelo aún no detecta pilares invertidos
+- Error de scipy al final (gráficos), pero modelo guardado correctamente
 
 ---
 
-## Mejores Configuraciones
+### Entrenamiento 4: 2024-12-07 - YOLOv12s 30 épocas + 92 frames auto-anotados
 
-### Para RTX 2060 (6GB VRAM)
+#### Configuración
+- **Modelo base**: yolo12s.pt
+- **GPU**: NVIDIA RTX 2060 (6GB VRAM)
+- **Batch size**: 8
+- **Image size**: 640
+- **Épocas**: 30
+- **Dataset**: 562 train / 139 val (+92 frames con pilares finos auto-anotados)
+
+#### Métricas Finales
+| Métrica | Valor |
+|---------|-------|
+| Precision | - |
+| Recall | - |
+| mAP@50 | - |
+| mAP@50-95 | - |
+
+#### Tiempos
+- Tiempo total: EN CURSO
+- Tiempo por época: ~14s
+
+#### Observaciones
+- 92 frames (282-391) con pilares finos/invertidos
+- Auto-anotados con template matching (threshold 0.85)
+- Objetivo: detectar ambos tipos de pilares
+
+---
+
+## Comparativa de Modelos
+
+| Entrenamiento | Modelo | Épocas | mAP50 | mAP50-95 | Inferencia |
+|---------------|--------|--------|-------|----------|------------|
+| #1 | YOLOv8n | 10 | 96.4% | 62.7% | 5ms |
+| #2 | YOLOv12s | 50 | 97.9% | 84.7% | 4ms |
+| #3 | YOLOv12s | 100 | 98.7% | 87.4% | 3.5ms |
+| #4 | YOLOv12s | 30 | - | - | - |
+
+**Conclusión:** YOLOv12s supera a YOLOv8n significativamente en mAP50-95, lo que indica mejor localización de bounding boxes.
+
+---
+
+## Recursos de GPU (RTX 2060)
+
+| Operación | VRAM | Potencia | Temperatura |
+|-----------|------|----------|-------------|
+| Idle (desktop) | ~500MB | ~10W | ~45°C |
+| Entrenamiento YOLO12s | ~3.5GB | ~115W | ~67°C |
+| Entrenamiento + Desktop | ~4.3GB | ~117W | ~67°C |
+| Inferencia | ~1.5GB | ~50W | ~55°C |
+
+**Nota:** Con entorno de escritorio activo, el consumo de VRAM y potencia aumenta ~200MB y ~5W respectivamente.
+
+---
+
+## Configuración Óptima RTX 2060
 
 ```yaml
-# config.yaml optimizado para RTX 2060
-model: yolov8n.pt
+model: yolo12s.pt
 batch: 8
 imgsz: 640
 workers: 4
-cache: False
-amp: True  # Importante para ahorrar memoria
-epochs: 100
+epochs: 50-100
 patience: 20
+amp: true
 ```
 
-**Tips específicos:**
-- No usar cache en RAM (memoria limitada)
-- Mantener batch=8 para evitar OOM
-- AMP (mixed precision) es crucial
-- Cerrar otras aplicaciones que usen GPU
-
-### Para RTX 5060 Ti (16GB VRAM) - Estimado
-
-```yaml
-# config.yaml optimizado para RTX 5060 Ti
-model: yolov8n.pt  # o yolov11n.pt
-batch: 32
-imgsz: 640  # o 1280 si necesitas más detalle
-workers: 8
-cache: ram  # Si tienes >=32GB de RAM del sistema
-amp: True
-epochs: 100
-patience: 20
-```
-
-**Tips específicos:**
-- Aprovechar batch grande para mejor convergencia
-- Considerar imgsz=1280 para objetos pequeños
-- Cache en RAM acelera significativamente
-- Posibilidad de usar modelos más grandes (yolov8s, yolov8m)
+**Tips:**
+- No exceder batch=8 para evitar OOM
+- AMP (mixed precision) activado por defecto
+- 50+ épocas recomendadas para buenos resultados
+- Cerrar aplicaciones pesadas durante entrenamiento
 
 ---
 
-## Experimentos Futuros
+## Próximos Experimentos
 
-### A probar con RTX 5060 Ti
-
-- [ ] Comparar YOLOv8n vs YOLOv11n
-- [ ] Probar batch=64 si VRAM lo permite
-- [ ] Evaluar imgsz=1280 vs 640
-- [ ] Test con modelo YOLOv8s (más grande)
-- [ ] Benchmark de inferencia con TensorRT
-
-### Optimizaciones pendientes
-
-- [ ] Exportar a ONNX para producción
-- [ ] Probar quantización INT8
-- [ ] Evaluar TensorRT para máxima velocidad
-- [ ] Test en diferentes resoluciones de entrada
+- [ ] Evaluar resultados con 92 frames invertidos
+- [ ] Probar batch=16 si hay margen de VRAM
+- [ ] Exportar a TensorRT
+- [ ] Benchmark de inferencia en video continuo
+- [ ] Comparativa cuando llegue RTX 5060 Ti
 
 ---
 
-## Notas de Implementación
-
-### Cómo agregar un nuevo benchmark
-
-1. Ejecutar entrenamiento:
-   ```bash
-   python scripts/train.py --name mi_experimento
-   ```
-
-2. Copiar métricas desde `runs/train/mi_experimento/results.csv`
-
-3. Agregar nueva sección usando la plantilla de arriba
-
-4. Actualizar gráficos comparativos si aplica
-
-### Archivos relacionados
-
-- Métricas detalladas: `runs/train/[experimento]/results.csv`
-- Curvas de entrenamiento: `runs/train/[experimento]/results.png`
-- Mejor modelo: `runs/train/[experimento]/weights/best.pt`
-- TensorBoard: `tensorboard --logdir runs/train`
-
----
-
-## Referencias
-
-- [Ultralytics YOLOv8 Metrics](https://docs.ultralytics.com/guides/yolo-performance-metrics/)
-- [mAP Explained](https://jonathan-hui.medium.com/map-mean-average-precision-for-object-detection-45c121a31173)
-- [Tips de Optimización GPU](https://docs.ultralytics.com/guides/model-training-tips/)
-
----
-
-*Última actualización: Diciembre 2024*
+*Última actualización: 7 Diciembre 2024*
