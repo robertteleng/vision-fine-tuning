@@ -24,8 +24,8 @@ DIST_FILES = [
     ("config.yaml", "config.yaml"),
 
     # Windows scripts
-    ("templates/install.bat", "install.bat"),
-    ("templates/run.bat", "run.bat"),
+    ("dist/install.bat", "install.bat"),
+    ("dist/run.bat", "run.bat"),
 
     # Data config
     ("data/pillar.yaml", "data/pillar.yaml"),
