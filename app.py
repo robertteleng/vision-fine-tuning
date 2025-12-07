@@ -5,14 +5,14 @@ VR Pillar Detector - Aplicación Gradio
 Interfaz web para detección de pilares en entornos VR.
 
 Uso:
-    python scripts/app.py
-    python scripts/app.py --share  # Compartir públicamente
+    python app.py
+    python app.py --share  # Compartir públicamente
 """
 
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import cv2

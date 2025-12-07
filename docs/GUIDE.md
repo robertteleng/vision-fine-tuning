@@ -7,13 +7,13 @@
 source .venv/bin/activate
 
 # Iniciar la aplicación
-python scripts/app.py
+python app.py
 
 # Con enlace público (para compartir)
-python scripts/app.py --share
+python app.py --share
 
 # Puerto personalizado
-python scripts/app.py --port 8080
+python app.py --port 8080
 ```
 
 La aplicación se abrirá automáticamente en tu navegador en `http://127.0.0.1:7860`
@@ -105,7 +105,7 @@ Información general del proyecto y enlaces útiles.
 ## Argumentos de Línea de Comandos
 
 ```bash
-python scripts/app.py [opciones]
+python app.py [opciones]
 
 Opciones:
   --share       Crear enlace público (gradio.live)
@@ -117,16 +117,16 @@ Opciones:
 
 ```bash
 # Ejecutar localmente
-python scripts/app.py
+python app.py
 
 # Compartir públicamente (crea URL temporal)
-python scripts/app.py --share
+python app.py --share
 
 # Acceder desde otra máquina en la red local
-python scripts/app.py --host 0.0.0.0
+python app.py --host 0.0.0.0
 
 # Puerto específico
-python scripts/app.py --port 8080 --host 0.0.0.0
+python app.py --port 8080 --host 0.0.0.0
 ```
 
 ---
@@ -170,7 +170,7 @@ El procesamiento de video no preserva el audio. Es una limitación conocida.
 
 ```bash
 # En el servidor
-python scripts/app.py --host 0.0.0.0 --port 7860
+python app.py --host 0.0.0.0 --port 7860
 
 # En tu máquina local
 ssh -L 7860:localhost:7860 usuario@servidor
@@ -180,7 +180,7 @@ ssh -L 7860:localhost:7860 usuario@servidor
 ### Enlace Público (Gradio Share)
 
 ```bash
-python scripts/app.py --share
+python app.py --share
 ```
 
 Esto crea un enlace temporal tipo `https://xxxxx.gradio.live` que funciona por 72 horas.
@@ -205,7 +205,7 @@ Esto crea un enlace temporal tipo `https://xxxxx.gradio.live` que funciona por 7
 ## Arquitectura
 
 ```
-scripts/app.py
+app.py
 ├── create_app()           # Crea la interfaz Gradio
 ├── run_inference_image()  # Inferencia en imágenes
 ├── run_inference_video()  # Inferencia en videos
