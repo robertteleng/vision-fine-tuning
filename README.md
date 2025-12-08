@@ -315,12 +315,13 @@ Temperatura típica durante entrenamiento: 65-70°C
 
 ---
 
-## Próximos Pasos
+## Completado
 
-- [ ] Verificar detección de pilares invertidos tras entrenamiento 4
-- [ ] Exportar modelo a TensorRT para inferencia más rápida
-- [ ] Crear script de benchmark comparativo
-- [ ] Probar con más videos de prueba
+- [x] Verificar detección de pilares invertidos tras entrenamiento 4
+- [x] Exportar modelo a TensorRT para inferencia más rápida (180 FPS)
+- [x] Crear script de benchmark comparativo
+- [x] Aplicación web Gradio con todas las funcionalidades
+- [x] Distribución Windows (install.bat / run.bat)
 
 ---
 
