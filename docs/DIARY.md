@@ -252,4 +252,114 @@ docs/           48KB (documentación)
 
 ---
 
-*Última actualización: 7 Diciembre 2025*
+## 2025-12-15 - Auto-Anotación Zero-Shot
+
+### Objetivo
+Eliminar la necesidad de anotar manualmente usando modelos zero-shot que detectan objetos a partir de descripciones de texto.
+
+### Experimento 1: YOLO-World (FALLIDO)
+
+**Script:** `scripts/auto_annotate_zeroshot.py`
+
+**Cómo funciona:**
+- YOLO-World combina YOLO con CLIP para entender descripciones de texto
+- Le dices "yellow black checkered box" y busca objetos que coincidan
+
+**Resultados:**
+| Prompt probado | Detecciones | Confianza |
+|----------------|-------------|-----------|
+| "yellow black checkered cube" | 0 | - |
+| "checkered block" | 0 | - |
+| "box" (genérico) | 6 | 0.05-0.09 |
+| "yellow box" | 0 | - |
+
+**Conclusión:** YOLO-World NO funciona para objetos VR específicos. CLIP fue entrenado con imágenes del mundo real y no reconoce bien patrones sintéticos/VR.
+
+---
+
+### Experimento 2: Grounding DINO (ÉXITO)
+
+**Scripts:**
+- `scripts/test_grounding_dino.py` - Test rápido para una imagen
+- `scripts/auto_annotate_grounding_dino.py` - Pipeline completo
+
+**Cómo funciona:**
+- Grounding DINO usa un modelo de lenguaje más potente
+- Mejor para objetos inusuales y prompts descriptivos
+- Usa HuggingFace transformers (fácil de instalar)
+
+**Resultados:**
+```
+Prompt: "yellow and black checkered box"
+Threshold: 0.25
+
+Total imágenes:      47
+Con detecciones:     47 (100%)
+Total detecciones:   259
+Promedio/imagen:     5.51
+Confianza:           0.25-0.69
+```
+
+**Comparativa:**
+| Métrica | YOLO-World | Grounding DINO |
+|---------|------------|----------------|
+| Cobertura | 8.5% | 100% |
+| Detecciones | 6 | 259 |
+| Confianza | 0.05-0.09 | 0.25-0.69 |
+| Velocidad | ~25 img/s | ~2 img/s |
+
+**Conclusión:** Grounding DINO es **43x mejor** para nuestro caso.
+
+---
+
+### Uso de Grounding DINO
+
+```bash
+# Test rápido en una imagen
+python scripts/test_grounding_dino.py \
+    --image data/video_frames/frame_0010.jpg \
+    --prompt "yellow and black checkered box" \
+    --threshold 0.25
+
+# Auto-anotar dataset completo
+python scripts/auto_annotate_grounding_dino.py \
+    --source data/video_frames/ \
+    --prompt "yellow and black checkered box" \
+    --output data/dataset_gdino/ \
+    --threshold 0.25 \
+    --class-name "vr_pillar"
+```
+
+---
+
+### Documentación Creada
+
+- `docs/ZERO_SHOT_GUIDE.md` - Guía educativa completa con:
+  - Diagramas de flujo (Mermaid)
+  - Explicaciones estilo pizarra
+  - Guía de prompts con ejemplos
+  - Troubleshooting visual
+  - Cheatsheet de 1 página
+
+---
+
+### Datasets Actuales
+
+| Dataset | Imágenes | Anotaciones | Origen |
+|---------|----------|-------------|--------|
+| `data/dataset/` | 701 | 219 | Template matching + manual |
+| `data/dataset_gdino/` | 47 | 259 | Grounding DINO |
+| `data/dataset_zeroshot_test*/` | - | - | **BORRAR** (pruebas) |
+
+---
+
+### Pendiente
+
+- [ ] Limpiar directorios de prueba (`dataset_zeroshot_test*`)
+- [ ] Decidir si combinar datasets para entrenar
+- [ ] Anotar `video_what_frames/` (145 imágenes) con Grounding DINO
+- [ ] Entrenar modelo con nuevo dataset
+
+---
+
+*Última actualización: 15 Diciembre 2025*
