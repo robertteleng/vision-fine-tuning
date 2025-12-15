@@ -315,6 +315,25 @@ Temperatura típica durante entrenamiento: 65-70°C
 
 ---
 
+## HITOs del Proyecto
+
+El proyecto está documentado en 8 HITOs usando el **Framework 3x3** (3 funciones troncales, máx 3 subpasos cada una).
+
+Ver documentación completa: **[docs/HITOS.md](docs/HITOS.md)**
+
+| HITO | Descripción | Script |
+|------|-------------|--------|
+| 1 | Auto-anotación Template Matching | `auto_annotate.py` |
+| 2 | División del Dataset | `split_dataset.py` |
+| 3 | Visualización de Anotaciones | `visualize_annotations.py` |
+| 4 | Entrenamiento YOLO12s | `train.py` |
+| 5 | Inferencia | `inference.py` |
+| 6 | Auto-anotación Grounding DINO | `auto_annotate_grounding_dino.py` |
+| 7 | Testing Completo | `tests/` (47 tests) |
+| 8 | GUI Robusta | `app.py` (7 tabs) |
+
+---
+
 ## Completado
 
 - [x] Verificar detección de pilares invertidos tras entrenamiento 4
@@ -322,6 +341,8 @@ Temperatura típica durante entrenamiento: 65-70°C
 - [x] Crear script de benchmark comparativo
 - [x] Aplicación web Gradio con todas las funcionalidades
 - [x] Distribución Windows (install.bat / run.bat)
+- [x] Suite de tests completa (47 tests)
+- [x] Documentación de HITOs con Framework 3x3
 
 ---
 
