@@ -253,16 +253,10 @@ def train(args):
     # Importamos aquí para que los mensajes de verificación salgan primero
     from ultralytics import YOLO
 
-    model_name = config.get('model', 'yolov8n.pt')
+    model_name = config.get('model', 'yolo12s.pt')
     logger.info(f"Cargando modelo base: {model_name}")
 
-    # -------------------------------------------------------------------------
     # El modelo se descarga automáticamente si no existe localmente
-    # Opciones recomendadas:
-    #   - yolov8n.pt: Nano, más rápido, menos preciso (6MB)
-    #   - yolov8s.pt: Small, buen balance (22MB)
-    #   - yolov11n.pt: Última versión nano (5.4MB)
-    # -------------------------------------------------------------------------
     model = YOLO(model_name)
 
     # Información del modelo
@@ -404,8 +398,14 @@ def train(args):
     best_model_path = PROJECT_ROOT / config.get('project', 'runs/train') / exp_name / 'weights' / 'best.pt'
 
     if best_model_path.exists():
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        versioned_name = f"vr_boxes_best_{timestamp}.pt"
+        timestamp = datetime.now().strftime("%Y%m%d")
+        # Extraer nombre del modelo base (ej: "yolo12s" de "yolo12s.pt")
+        base_model = Path(model_name).stem  # yolo12s.pt → yolo12s
+        # Formato: {modelo_base}_pillars_{fecha}.pt  o  {modelo_base}+pillars_{fecha}.pt
+        if args.coco:
+            versioned_name = f"{base_model}+pillars_{timestamp}.pt"  # COCO + pillars
+        else:
+            versioned_name = f"{base_model}_pillars_{timestamp}.pt"  # solo pillars
         versioned_path = models_dir / versioned_name
 
         import shutil
@@ -494,6 +494,12 @@ Ejemplos de uso:
         '--force-cpu',
         action='store_true',
         help='Forzar entrenamiento en CPU (MUY lento, solo para testing)'
+    )
+
+    parser.add_argument(
+        '--coco',
+        action='store_true',
+        help='Indica que el modelo incluye clases COCO + pillars (cambia nomenclatura)'
     )
 
     args = parser.parse_args()

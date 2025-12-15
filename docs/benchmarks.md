@@ -19,10 +19,10 @@ Este documento registra las métricas de entrenamiento y comparativas de rendimi
 
 ## Historial de Entrenamientos
 
-### Entrenamiento 1: 2025-12-07 - YOLOv8n Baseline
+### Entrenamiento 1: 2025-12-07 - YOLOv12s Baseline
 
 #### Configuración
-- **Modelo base**: yolov8n.pt
+- **Modelo base**: yolov12s.pt
 - **GPU**: NVIDIA RTX 2060 (6GB VRAM)
 - **Batch size**: 8
 - **Image size**: 640
@@ -209,4 +209,37 @@ amp: true
 
 ---
 
-*Última actualización: 7 Diciembre 2025*
+---
+
+## Nomenclatura de Modelos Entrenados
+
+### Formato
+
+```
+{modelo_base}_{clases}_{fecha}.pt      ← solo detecta pillars
+{modelo_base}+{clases}_{fecha}.pt      ← COCO (80 clases) + pillars
+```
+
+### Ejemplos
+
+| Archivo | Modelo Base | Clases | Descripción |
+|---------|-------------|--------|-------------|
+| `yolo12s_pillars_20241215.pt` | YOLO12 Small | 1 (pillar) | Solo detecta pillars |
+| `yolo12s+pillars_20241215.pt` | YOLO12 Small | 81 (COCO + pillar) | Detecta todo COCO + pillars |
+| `yolo12n_pillars_20241210.pt` | YOLO12 Nano | 1 (pillar) | Solo detecta pillars |
+
+### Uso en train.py
+
+```bash
+# Entrenar solo pillars (default)
+python scripts/train.py
+# → models/yolo12s_pillars_20241215.pt
+
+# Entrenar COCO + pillars
+python scripts/train.py --coco
+# → models/yolo12s+pillars_20241215.pt
+```
+
+---
+
+*Última actualización: 15 Diciembre 2025*

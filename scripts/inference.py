@@ -86,7 +86,8 @@ def find_best_model() -> Path:
     # 3. No se encontró modelo entrenado
     raise FileNotFoundError(
         "No se encontró ningún modelo entrenado.\n"
-        "Ejecuta primero: python scripts/train.py"
+        "Ejecuta primero: python scripts/train.py\n"
+        "O especifica un modelo con --model ruta/al/modelo.pt"
     )
 
 
