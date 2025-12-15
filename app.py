@@ -474,8 +474,10 @@ def load_annotations_dataset(dataset_choice):
     """Wrapper to load dataset."""
     if dataset_choice == "Train":
         path = DATA_DIR / "dataset" / "train"
-    else:
+    elif dataset_choice == "Val":
         path = DATA_DIR / "dataset" / "val"
+    else:  # video_what
+        path = DATA_DIR / "dataset_what"
     return annotation_reviewer.load_dataset(str(path))
 
 
@@ -670,8 +672,8 @@ def create_app():
 
                 with gr.Row():
                     ann_dataset = gr.Radio(
-                        choices=["Train", "Val"],
-                        value="Train",
+                        choices=["Train", "Val", "video_what"],
+                        value="video_what",
                         label="Dataset"
                     )
                     ann_load_btn = gr.Button("Load Dataset", variant="primary")
