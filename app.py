@@ -89,11 +89,20 @@ def load_model(model_path: str = None):
 def run_inference_image(image, model_choice, confidence, iou_threshold):
     """Run inference on an image."""
     if image is None:
-        return None, "Please upload an image"
+        return None, "⚠️ Please upload an image"
 
     try:
+        # Validate parameters
+        if not 0 < confidence <= 1:
+            return None, "⚠️ Confidence must be between 0 and 1"
+        if not 0 < iou_threshold <= 1:
+            return None, "⚠️ IoU threshold must be between 0 and 1"
+
         # Load model
         model_path = MODELS_DIR / model_choice if model_choice else None
+        if model_path and not model_path.exists():
+            return None, f"❌ Model not found: {model_choice}"
+
         model = load_model(str(model_path) if model_path else None)
 
         # Run inference
@@ -106,16 +115,18 @@ def run_inference_image(image, model_choice, confidence, iou_threshold):
         num_detections = len(results[0].boxes)
         if num_detections > 0:
             confs = results[0].boxes.conf.cpu().numpy()
-            stats = f"**Detections:** {num_detections}\n\n"
+            stats = f"✅ **Detections:** {num_detections}\n\n"
             stats += f"**Confidence:** {confs.min():.2f} - {confs.max():.2f}\n\n"
             stats += f"**Mean:** {confs.mean():.2f}"
         else:
-            stats = "**No pillars detected**"
+            stats = "ℹ️ **No pillars detected**\n\nTry lowering the confidence threshold."
 
         return annotated, stats
 
+    except FileNotFoundError as e:
+        return None, f"❌ Model not found: {str(e)}"
     except Exception as e:
-        return None, f"Error: {str(e)}"
+        return None, f"❌ Error: {str(e)}"
 
 
 def run_inference_video(video_path, model_choice, confidence, iou_threshold, progress=gr.Progress()):
@@ -124,18 +135,29 @@ def run_inference_video(video_path, model_choice, confidence, iou_threshold, pro
     import tempfile
 
     if video_path is None:
-        return None, "Please upload a video"
+        return None, "⚠️ Please upload a video"
 
     try:
+        # Validate model
         model_path = MODELS_DIR / model_choice if model_choice else None
+        if model_path and not model_path.exists():
+            return None, f"❌ Model not found: {model_choice}"
+
         model = load_model(str(model_path) if model_path else None)
 
         # Open video
         cap = cv2.VideoCapture(video_path)
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        if not cap.isOpened():
+            return None, "❌ Could not open video file"
+
+        fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        if total_frames == 0:
+            cap.release()
+            return None, "❌ Video appears to be empty"
 
         # Create output video
         output_path = tempfile.mktemp(suffix=".mp4")
@@ -164,14 +186,18 @@ def run_inference_video(video_path, model_choice, confidence, iou_threshold, pro
         cap.release()
         out.release()
 
-        stats = f"**Frames processed:** {frame_count}\n\n"
+        stats = f"✅ **Processing complete!**\n\n"
+        stats += f"**Frames processed:** {frame_count}\n\n"
         stats += f"**Total detections:** {total_detections}\n\n"
-        stats += f"**Average per frame:** {total_detections/frame_count:.1f}"
+        if frame_count > 0:
+            stats += f"**Average per frame:** {total_detections/frame_count:.1f}"
 
         return output_path, stats
 
+    except FileNotFoundError as e:
+        return None, f"❌ Model not found: {str(e)}"
     except Exception as e:
-        return None, f"Error: {str(e)}"
+        return None, f"❌ Error: {str(e)}"
 
 
 # ============================================================================
@@ -271,21 +297,35 @@ def start_training(epochs, batch_size, model_base, progress=gr.Progress()):
     try:
         from ultralytics import YOLO
         import yaml
+        import torch
+
+        # Check GPU availability
+        if not torch.cuda.is_available():
+            return "⚠️ **Warning:** No GPU detected. Training will be slow on CPU.\n\nContinue anyway by clicking 'Start Training' again."
 
         # Load configuration
         config_path = PROJECT_ROOT / "config.yaml"
+        if not config_path.exists():
+            return f"❌ Configuration not found: {config_path}"
+
         with open(config_path) as f:
             config = yaml.safe_load(f)
 
-        # Update parameters
-        config["epochs"] = epochs
-        config["batch"] = batch_size
+        # Dataset validation
+        data_yaml = PROJECT_ROOT / "data" / "pillar.yaml"
+        if not data_yaml.exists():
+            return f"❌ Dataset config not found: {data_yaml}"
+
+        # Validate dataset exists
+        with open(data_yaml) as f:
+            data_config = yaml.safe_load(f)
+
+        dataset_path = Path(data_config.get('path', ''))
+        if not dataset_path.exists():
+            return f"❌ Dataset not found: {dataset_path}\n\nPlease check your pillar.yaml configuration."
 
         # Load base model
         model = YOLO(model_base)
-
-        # Dataset
-        data_yaml = PROJECT_ROOT / "data" / "pillar.yaml"
 
         # Train
         results = model.train(
@@ -297,10 +337,14 @@ def start_training(epochs, batch_size, model_base, progress=gr.Progress()):
             verbose=True
         )
 
-        return f"Training completed. Results in: {results.save_dir}"
+        return f"✅ **Training completed!**\n\nResults saved to: `{results.save_dir}`"
 
+    except RuntimeError as e:
+        if "CUDA out of memory" in str(e):
+            return f"❌ **Out of GPU memory!**\n\nTry reducing batch size to {batch_size // 2}."
+        return f"❌ Runtime error: {str(e)}"
     except Exception as e:
-        return f"Error during training: {str(e)}"
+        return f"❌ Error during training: {str(e)}"
 
 
 def get_training_status():
@@ -329,6 +373,381 @@ def get_training_status():
                     status += f"  - Epochs: {len(rows)}\n"
 
     return status
+
+
+# ============================================================================
+# TAB: AUTO-ANNOTATION (Grounding DINO)
+# ============================================================================
+
+class AutoAnnotator:
+    """Auto-annotation using Grounding DINO."""
+
+    def __init__(self):
+        self.model = None
+        self.processor = None
+        self.device = None
+
+    def load_model(self, model_name: str = "IDEA-Research/grounding-dino-tiny"):
+        """Load Grounding DINO model."""
+        import torch
+        from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.processor = AutoProcessor.from_pretrained(model_name)
+        self.model = AutoModelForZeroShotObjectDetection.from_pretrained(model_name).to(self.device)
+        return f"Model loaded on {self.device}"
+
+    def annotate_image(self, image, prompt: str, threshold: float = 0.3):
+        """Annotate a single image."""
+        import torch
+        from PIL import Image as PILImage
+
+        if image is None:
+            return None, "No image provided", ""
+
+        if self.model is None:
+            return None, "Model not loaded. Click 'Load Model' first.", ""
+
+        # Ensure prompt ends with period
+        prompt = prompt if prompt.endswith(".") else prompt + "."
+
+        # Convert to PIL if numpy
+        if isinstance(image, np.ndarray):
+            pil_image = PILImage.fromarray(image)
+        else:
+            pil_image = image
+
+        width, height = pil_image.size
+
+        # Inference
+        inputs = self.processor(images=pil_image, text=prompt, return_tensors="pt").to(self.device)
+
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+
+        results = self.processor.post_process_grounded_object_detection(
+            outputs,
+            input_ids=inputs.input_ids,
+            target_sizes=[(height, width)]
+        )[0]
+
+        # Filter by threshold
+        mask = results["scores"] >= threshold
+        boxes = results["boxes"][mask].cpu().numpy()
+        scores = results["scores"][mask].cpu().numpy()
+
+        # Draw on image
+        img_display = np.array(pil_image).copy()
+        yolo_lines = []
+
+        for box, score in zip(boxes, scores):
+            x1, y1, x2, y2 = map(int, box)
+            cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 3)
+            cv2.putText(img_display, f"{score:.2f}", (x1, y1 - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+            # YOLO format
+            x_center = ((box[0] + box[2]) / 2) / width
+            y_center = ((box[1] + box[3]) / 2) / height
+            w = (box[2] - box[0]) / width
+            h = (box[3] - box[1]) / height
+            yolo_lines.append(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
+
+        stats = f"**Detections:** {len(boxes)}"
+        if len(boxes) > 0:
+            stats += f"\n**Confidence range:** {scores.min():.2f} - {scores.max():.2f}"
+
+        yolo_output = "\n".join(yolo_lines) if yolo_lines else "# No detections"
+
+        return img_display, stats, yolo_output
+
+    def annotate_folder(self, source_folder: str, output_folder: str, prompt: str,
+                        threshold: float, val_split: float, copy_images: bool,
+                        progress=gr.Progress()):
+        """Annotate entire folder and create YOLO dataset."""
+        import torch
+        import shutil
+        import random
+
+        if self.model is None:
+            return "Error: Model not loaded. Click 'Load Model' first."
+
+        source_path = Path(source_folder)
+        output_path = Path(output_folder)
+
+        if not source_path.exists():
+            return f"Error: Source folder not found: {source_folder}"
+
+        # Find images
+        exts = ['*.jpg', '*.jpeg', '*.png', '*.bmp']
+        images = []
+        for ext in exts:
+            images.extend(source_path.glob(ext))
+            images.extend(source_path.glob(ext.upper()))
+        images = sorted(images)
+
+        if len(images) == 0:
+            return f"Error: No images found in {source_folder}"
+
+        # Setup directories
+        dirs = {
+            'images_train': output_path / 'images' / 'train',
+            'images_val': output_path / 'images' / 'val',
+            'labels_train': output_path / 'labels' / 'train',
+            'labels_val': output_path / 'labels' / 'val',
+        }
+        for d in dirs.values():
+            d.mkdir(parents=True, exist_ok=True)
+
+        # Prepare prompt
+        prompt = prompt if prompt.endswith(".") else prompt + "."
+
+        # Split train/val
+        random.seed(42)
+        images_shuffled = images.copy()
+        random.shuffle(images_shuffled)
+        val_count = int(len(images) * val_split)
+        val_set = set(images_shuffled[:val_count])
+
+        # Stats
+        stats = {'total': len(images), 'with_detections': 0, 'total_detections': 0, 'train': 0, 'val': 0}
+
+        # Process
+        for i, img_path in enumerate(progress.tqdm(images, desc="Annotating")):
+            from PIL import Image as PILImage
+
+            pil_image = PILImage.open(img_path).convert("RGB")
+            width, height = pil_image.size
+
+            # Inference
+            inputs = self.processor(images=pil_image, text=prompt, return_tensors="pt").to(self.device)
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+
+            results = self.processor.post_process_grounded_object_detection(
+                outputs, input_ids=inputs.input_ids, target_sizes=[(height, width)]
+            )[0]
+
+            mask = results["scores"] >= threshold
+            boxes = results["boxes"][mask].cpu().numpy()
+
+            # Determine split
+            is_val = img_path in val_set
+            split = 'val' if is_val else 'train'
+            stats[split] += 1
+
+            # Save labels
+            label_dir = dirs['labels_val'] if is_val else dirs['labels_train']
+            label_path = label_dir / f"{img_path.stem}.txt"
+
+            yolo_lines = []
+            for box in boxes:
+                x_center = ((box[0] + box[2]) / 2) / width
+                y_center = ((box[1] + box[3]) / 2) / height
+                w = (box[2] - box[0]) / width
+                h = (box[3] - box[1]) / height
+                yolo_lines.append(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
+
+            with open(label_path, 'w') as f:
+                f.write('\n'.join(yolo_lines))
+
+            if len(boxes) > 0:
+                stats['with_detections'] += 1
+            stats['total_detections'] += len(boxes)
+
+            # Copy/link image
+            img_dir = dirs['images_val'] if is_val else dirs['images_train']
+            img_dest = img_dir / img_path.name
+
+            if copy_images:
+                shutil.copy2(img_path, img_dest)
+            else:
+                if not img_dest.exists():
+                    try:
+                        img_dest.symlink_to(img_path.absolute())
+                    except OSError:
+                        shutil.copy2(img_path, img_dest)
+
+        # Create dataset.yaml
+        yaml_content = {
+            'path': str(output_path.absolute()),
+            'train': 'images/train',
+            'val': 'images/val',
+            'names': {0: 'pillar'},
+        }
+        yaml_path = output_path / 'dataset.yaml'
+        with open(yaml_path, 'w') as f:
+            yaml.dump(yaml_content, f, default_flow_style=False)
+
+        # Return summary
+        coverage = stats['with_detections'] / stats['total'] * 100 if stats['total'] > 0 else 0
+        return f"""## Annotation Complete!
+
+**Statistics:**
+- Total images: {stats['total']}
+- With detections: {stats['with_detections']} ({coverage:.1f}%)
+- Total detections: {stats['total_detections']}
+- Train: {stats['train']} | Val: {stats['val']}
+
+**Dataset YAML:** `{yaml_path}`
+
+**Next step:** Train with:
+```
+python scripts/train.py --data {yaml_path}
+```
+"""
+
+
+# Global auto-annotator instance
+auto_annotator = AutoAnnotator()
+
+
+def load_grounding_dino():
+    """Load Grounding DINO model."""
+    try:
+        return auto_annotator.load_model()
+    except Exception as e:
+        return f"Error loading model: {str(e)}"
+
+
+def annotate_single_image(image, prompt, threshold):
+    """Wrapper for single image annotation."""
+    return auto_annotator.annotate_image(image, prompt, threshold)
+
+
+def annotate_folder_batch(source, output, prompt, threshold, val_split, copy_images, progress=gr.Progress()):
+    """Wrapper for folder annotation."""
+    return auto_annotator.annotate_folder(source, output, prompt, threshold, val_split, copy_images, progress)
+
+
+# ============================================================================
+# TAB: DATASET MANAGER
+# ============================================================================
+
+def get_dataset_stats():
+    """Get statistics about the current dataset."""
+    dataset_dir = DATA_DIR / "dataset"
+    if not dataset_dir.exists():
+        return "No dataset found at data/dataset/"
+
+    stats = "## Dataset Statistics\n\n"
+
+    for split in ['train', 'val']:
+        images_dir = dataset_dir / split / 'images'
+        labels_dir = dataset_dir / split / 'labels'
+
+        if images_dir.exists():
+            images = list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.png"))
+            labels = list(labels_dir.glob("*.txt")) if labels_dir.exists() else []
+
+            # Count annotations
+            total_annotations = 0
+            for label_file in labels:
+                content = label_file.read_text().strip()
+                if content:
+                    total_annotations += len(content.split('\n'))
+
+            stats += f"### {split.capitalize()}\n"
+            stats += f"- Images: {len(images)}\n"
+            stats += f"- Labels: {len(labels)}\n"
+            stats += f"- Total annotations: {total_annotations}\n"
+            if len(images) > 0:
+                stats += f"- Avg annotations/image: {total_annotations/len(images):.2f}\n"
+            stats += "\n"
+
+    return stats
+
+
+def validate_dataset():
+    """Validate dataset integrity."""
+    dataset_dir = DATA_DIR / "dataset"
+    if not dataset_dir.exists():
+        return "No dataset found"
+
+    issues = []
+
+    for split in ['train', 'val']:
+        images_dir = dataset_dir / split / 'images'
+        labels_dir = dataset_dir / split / 'labels'
+
+        if not images_dir.exists():
+            issues.append(f"❌ {split}/images/ not found")
+            continue
+
+        images = list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.png"))
+
+        # Check for missing labels
+        missing_labels = []
+        for img in images:
+            label_path = labels_dir / f"{img.stem}.txt"
+            if not label_path.exists():
+                missing_labels.append(img.name)
+
+        if missing_labels:
+            issues.append(f"⚠️ {split}: {len(missing_labels)} images without labels")
+
+        # Check label format
+        invalid_labels = []
+        for label_file in labels_dir.glob("*.txt") if labels_dir.exists() else []:
+            content = label_file.read_text().strip()
+            if not content:
+                continue
+            for line_num, line in enumerate(content.split('\n'), 1):
+                parts = line.strip().split()
+                if len(parts) < 5:
+                    invalid_labels.append(f"{label_file.name}:{line_num}")
+                    continue
+                try:
+                    int(parts[0])  # class
+                    for val in parts[1:5]:
+                        v = float(val)
+                        if not (0 <= v <= 1):
+                            invalid_labels.append(f"{label_file.name}:{line_num} (out of range)")
+                except ValueError:
+                    invalid_labels.append(f"{label_file.name}:{line_num}")
+
+        if invalid_labels:
+            issues.append(f"❌ {split}: {len(invalid_labels)} invalid label lines")
+
+    if not issues:
+        return "✅ Dataset is valid! No issues found."
+
+    return "## Validation Results\n\n" + "\n".join(issues)
+
+
+def export_dataset(export_format: str, output_name: str):
+    """Export dataset to different formats."""
+    import shutil
+    import zipfile
+    from datetime import datetime
+
+    dataset_dir = DATA_DIR / "dataset"
+    if not dataset_dir.exists():
+        return "No dataset found"
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_name = output_name or f"dataset_export_{timestamp}"
+
+    if export_format == "ZIP (YOLO format)":
+        output_path = PROJECT_ROOT / "exports" / f"{output_name}.zip"
+        output_path.parent.mkdir(exist_ok=True)
+
+        with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for file in dataset_dir.rglob("*"):
+                if file.is_file():
+                    arcname = file.relative_to(dataset_dir)
+                    zf.write(file, arcname)
+
+        return f"✅ Exported to: `{output_path}`\n\nSize: {output_path.stat().st_size / 1024 / 1024:.2f} MB"
+
+    elif export_format == "Copy to folder":
+        output_path = PROJECT_ROOT / "exports" / output_name
+        if output_path.exists():
+            shutil.rmtree(output_path)
+        shutil.copytree(dataset_dir, output_path)
+        return f"✅ Copied to: `{output_path}`"
+
+    return "Unknown export format"
 
 
 # ============================================================================
@@ -512,7 +931,19 @@ def create_app():
     model_choices = [m.name for m in find_available_models()]
     default_model = model_choices[0] if model_choices else None
 
-    with gr.Blocks(title=APP_TITLE) as app:
+    # Custom CSS for better styling
+    custom_css = """
+    .gradio-container {
+        max-width: 1400px !important;
+    }
+    .status-box {
+        padding: 10px;
+        border-radius: 5px;
+        margin: 5px 0;
+    }
+    """
+
+    with gr.Blocks(title=APP_TITLE, css=custom_css, theme=gr.themes.Soft()) as app:
 
         gr.Markdown(f"# {APP_TITLE}")
         gr.Markdown(APP_DESCRIPTION)
@@ -661,6 +1092,130 @@ def create_app():
                     start_training,
                     inputs=[train_epochs, train_batch, train_model],
                     outputs=[train_output]
+                )
+
+            # ----------------------------------------------------------------
+            # TAB: AUTO-ANNOTATION
+            # ----------------------------------------------------------------
+            with gr.TabItem("Auto-Annotate", id="auto_annotate"):
+                gr.Markdown("## Zero-Shot Auto-Annotation with Grounding DINO")
+                gr.Markdown("Automatically annotate images using natural language descriptions.")
+
+                with gr.Row():
+                    with gr.Column():
+                        aa_model_status = gr.Markdown("**Model:** Not loaded")
+                        aa_load_btn = gr.Button("Load Grounding DINO", variant="primary")
+
+                with gr.Tabs():
+                    # Single image annotation
+                    with gr.TabItem("Single Image"):
+                        with gr.Row():
+                            with gr.Column():
+                                aa_image = gr.Image(label="Input Image", type="numpy")
+                                aa_prompt = gr.Textbox(
+                                    label="Detection Prompt",
+                                    value="yellow and black checkered pillar",
+                                    placeholder="Describe the object to detect..."
+                                )
+                                aa_threshold = gr.Slider(
+                                    0.1, 0.9, value=0.3, step=0.05,
+                                    label="Confidence Threshold"
+                                )
+                                aa_detect_btn = gr.Button("Detect", variant="secondary")
+
+                            with gr.Column():
+                                aa_output = gr.Image(label="Result")
+                                aa_stats = gr.Markdown()
+                                aa_yolo = gr.Textbox(label="YOLO Format", lines=5)
+
+                        aa_load_btn.click(load_grounding_dino, outputs=[aa_model_status])
+                        aa_detect_btn.click(
+                            annotate_single_image,
+                            inputs=[aa_image, aa_prompt, aa_threshold],
+                            outputs=[aa_output, aa_stats, aa_yolo]
+                        )
+
+                    # Batch annotation
+                    with gr.TabItem("Batch Annotation"):
+                        gr.Markdown("Annotate an entire folder and create a YOLO dataset.")
+
+                        with gr.Row():
+                            with gr.Column():
+                                aa_source = gr.Textbox(
+                                    label="Source Folder",
+                                    placeholder="/path/to/images",
+                                    value=str(DATA_DIR / "video_frames")
+                                )
+                                aa_output_folder = gr.Textbox(
+                                    label="Output Folder",
+                                    placeholder="/path/to/output",
+                                    value=str(DATA_DIR / "dataset_auto")
+                                )
+                                aa_batch_prompt = gr.Textbox(
+                                    label="Detection Prompt",
+                                    value="yellow and black checkered pillar"
+                                )
+                                aa_batch_threshold = gr.Slider(
+                                    0.1, 0.9, value=0.3, step=0.05,
+                                    label="Confidence Threshold"
+                                )
+                                aa_val_split = gr.Slider(
+                                    0.1, 0.4, value=0.2, step=0.05,
+                                    label="Validation Split"
+                                )
+                                aa_copy = gr.Checkbox(label="Copy images (instead of symlinks)", value=False)
+                                aa_batch_btn = gr.Button("Start Batch Annotation", variant="primary")
+
+                            with gr.Column():
+                                aa_batch_result = gr.Markdown("Click 'Start Batch Annotation' to begin.")
+
+                        aa_batch_btn.click(
+                            annotate_folder_batch,
+                            inputs=[aa_source, aa_output_folder, aa_batch_prompt,
+                                   aa_batch_threshold, aa_val_split, aa_copy],
+                            outputs=[aa_batch_result]
+                        )
+
+            # ----------------------------------------------------------------
+            # TAB: DATASET MANAGER
+            # ----------------------------------------------------------------
+            with gr.TabItem("Dataset", id="dataset"):
+                gr.Markdown("## Dataset Manager")
+
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown("### Statistics")
+                        ds_stats = gr.Markdown(get_dataset_stats())
+                        ds_refresh_btn = gr.Button("Refresh Statistics")
+
+                    with gr.Column():
+                        gr.Markdown("### Validation")
+                        ds_validation = gr.Markdown()
+                        ds_validate_btn = gr.Button("Validate Dataset", variant="secondary")
+
+                gr.Markdown("---")
+                gr.Markdown("### Export Dataset")
+
+                with gr.Row():
+                    ds_export_format = gr.Radio(
+                        choices=["ZIP (YOLO format)", "Copy to folder"],
+                        value="ZIP (YOLO format)",
+                        label="Export Format"
+                    )
+                    ds_export_name = gr.Textbox(
+                        label="Output Name (optional)",
+                        placeholder="Leave empty for auto-generated name"
+                    )
+                    ds_export_btn = gr.Button("Export", variant="primary")
+
+                ds_export_result = gr.Markdown()
+
+                ds_refresh_btn.click(get_dataset_stats, outputs=[ds_stats])
+                ds_validate_btn.click(validate_dataset, outputs=[ds_validation])
+                ds_export_btn.click(
+                    export_dataset,
+                    inputs=[ds_export_format, ds_export_name],
+                    outputs=[ds_export_result]
                 )
 
             # ----------------------------------------------------------------
