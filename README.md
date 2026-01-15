@@ -54,7 +54,14 @@ flowchart LR
 
 ```
 fine-tuning-vr/
+├── app.py                       # Interfaz Gradio (importa de src/)
 ├── config.yaml                  # Configuración de entrenamiento
+├── src/                         # Módulos de lógica de negocio
+│   ├── inference.py             # Carga de modelos e inferencia
+│   ├── training.py              # Rutinas de entrenamiento YOLO
+│   ├── dataset.py               # Gestión y validación de datasets
+│   ├── benchmark.py             # Benchmarking de rendimiento
+│   └── annotation.py            # Auto-anotación y revisión
 ├── data/
 │   ├── dataset/                 # Dataset principal
 │   │   ├── train/images/        # 562 imágenes
@@ -66,15 +73,14 @@ fine-tuning-vr/
 │   ├── video_frames/            # Frames extraídos
 │   └── templates/               # Templates para auto-anotación
 ├── scripts/
-│   ├── train.py                 # Entrenamiento completo
+│   ├── train.py                 # Entrenamiento completo (CLI)
 │   ├── inference.py             # Inferencia (imagen/video/webcam)
 │   ├── auto_annotate.py         # Auto-anotación con template matching
 │   ├── visualize_annotations.py # Visualizar anotaciones
-│   ├── review_annotations.py    # Revisor interactivo de anotaciones
 │   ├── split_dataset.py         # Dividir train/val
-│   ├── evaluate.py              # Evaluación de métricas
 │   ├── export_tensorrt.py       # Exportación a TensorRT/ONNX
 │   └── benchmark.py             # Comparar velocidad de formatos
+├── tests/                       # Suite de tests (47 tests)
 ├── models/                      # Modelos (.pt, .onnx, .engine)
 └── runs/                        # Logs de entrenamiento
 ```
@@ -355,4 +361,4 @@ Ver documentación completa: **[docs/HITOS.md](docs/HITOS.md)**
 
 ---
 
-*Última actualización: Diciembre 2025*
+*Última actualización: Enero 2026*

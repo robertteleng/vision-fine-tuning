@@ -289,9 +289,9 @@ tests/
 
 ## HITO 8: GUI Robusta con Gradio
 
-**Descripción:** Aplicación web Gradio con todas las funcionalidades del proyecto.
+**Descripción:** Aplicación web Gradio con arquitectura modular.
 
-**Goal:** Interfaz completa con 7 tabs funcionales y buen error handling.
+**Goal:** Interfaz completa con 7 tabs funcionales y lógica desacoplada en `src/`.
 
 **Inputs:**
 - `models/`, `data/dataset/`, `config.yaml`
@@ -302,29 +302,33 @@ tests/
 
 **Minimap:**
 ```
-gr.Blocks() --> gr.Tabs() --> 7 tabs con callbacks --> app.launch(port=7860)
+src/*.py (lógica) --> app.py (UI Gradio) --> 7 tabs --> app.launch(port=7860)
 ```
 
 **Breakdown 3x3:**
 ```
-app.py
+src/                              # Módulos de lógica de negocio
+├── inference.py                  # find_available_models, run_inference_image/video
+├── training.py                   # start_training, get_training_status
+├── dataset.py                    # get_dataset_stats, validate_dataset, export
+├── benchmark.py                  # run_benchmark
+└── annotation.py                 # AutoAnnotator, AnnotationReviewer
+
+app.py                            # Interfaz Gradio (ligera)
 │
-├── 1. Tab Inference
-│       run_inference_image(img, model, conf, iou)
-│           results = model(img, conf=conf)
-│           return results[0].plot(), f"✅ {len(boxes)} detections"
-│       run_inference_video(...)         # procesa frame a frame
+├── 1. Imports de src/
+│       from src.inference import run_inference_image, ...
+│       from src.annotation import AutoAnnotator, ...
 │
-├── 2. Tab Auto-Annotate (class AutoAnnotator)
-│       load_model()                     # carga Grounding DINO
-│       annotate_image(img, prompt)      # una imagen
-│       annotate_folder(source, output)  # batch + dataset.yaml
+├── 2. Wrappers para Gradio
+│       def annotate_single_image(img, prompt, threshold):
+│           return auto_annotator.annotate_image(...)
+│       # Adapta clases/funciones de src/ a callbacks de Gradio
 │
-└── 3. Tab Annotations (class AnnotationReviewer)
-        load_dataset(path)               # cargar train/val
-        next_image() / prev_image()      # navegación
-        delete_annotation(id)            # editar labels
-        # Guarda cambios automáticamente
+└── 3. create_app() --> gr.Blocks()
+        with gr.Tabs():
+            Tab Inference, Metrics, Training, Auto-Annotate, ...
+        # UI pura, sin lógica de negocio
 ```
 
 ---
@@ -340,7 +344,7 @@ app.py
 | 5 | Inferencia | `inference.py` | ✅ |
 | 6 | Auto-anotación Grounding DINO | `auto_annotate_grounding_dino.py` | ✅ |
 | 7 | Testing Completo | `tests/` | ✅ |
-| 8 | GUI Robusta | `app.py` | ✅ |
+| 8 | GUI Robusta (modular) | `app.py` + `src/` | ✅ |
 
 ---
 
@@ -357,4 +361,4 @@ app.py
 
 ---
 
-*Última actualización: Diciembre 2025*
+*Última actualización: Enero 2026*
