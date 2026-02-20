@@ -1,121 +1,161 @@
+"""Training routines for YOLO models."""
+
+import csv
 from pathlib import Path
+
 try:
     import gradio as gr
 except ImportError:
     gr = None
 
-PROJECT_ROOT = Path(__file__).parent.parent
+from src.hardware import detect_gpu, get_hardware_summary
+from src.project import PROJECT_ROOT, find_dataset_yamls
 
-def start_training(epochs, batch_size, model_base, progress=gr.Progress() if gr else None):
-    """Start model training."""
+RUNS_DIR = PROJECT_ROOT / "runs" / "train"
+
+
+def start_training(epochs, batch_size, model_base, data_yaml_path, progress=gr.Progress() if gr else None):
+    """Start model training.
+
+    Args:
+        epochs: Number of training epochs.
+        batch_size: Batch size (-1 for auto).
+        model_base: Base model name, e.g. "yolo26m.pt".
+        data_yaml_path: Path to dataset YAML file.
+    """
     try:
         from ultralytics import YOLO
         import yaml
-        import torch
 
-        # Check GPU availability
-        if not torch.cuda.is_available():
-            return "⚠️ **Warning:** No GPU detected. Training will be slow on CPU.\n\nContinue anyway by clicking 'Start Training' again."
-
-        # Load configuration
-        config_path = PROJECT_ROOT / "config.yaml"
-        if not config_path.exists():
-            return f"❌ Configuration not found: {config_path}"
-
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
+        gpu = detect_gpu()
+        if not gpu.available:
+            return "Warning: No GPU detected. Training will run on CPU."
 
         # Dataset validation
-        data_yaml = PROJECT_ROOT / "data" / "pillar.yaml"
+        data_yaml = Path(data_yaml_path)
         if not data_yaml.exists():
-            return f"❌ Dataset config not found: {data_yaml}"
+            return f"Error: Dataset config not found: {data_yaml}"
 
-        # Validate dataset exists
         with open(data_yaml) as f:
             data_config = yaml.safe_load(f)
 
-        dataset_path = Path(data_config.get('path', ''))
+        dataset_path = Path(data_config.get("path", ""))
         if not dataset_path.exists():
-            return f"❌ Dataset not found: {dataset_path}\n\nPlease check your pillar.yaml configuration."
+            return f"Error: Dataset not found at: {dataset_path}"
 
-        # Load base model
+        # Load config.yaml for additional training params
+        config_path = PROJECT_ROOT / "config.yaml"
+        extra_params = {}
+        if config_path.exists():
+            with open(config_path) as f:
+                config = yaml.safe_load(f) or {}
+            # Pick training-relevant keys only
+            for key in ("imgsz", "patience", "lr0", "lrf", "momentum", "weight_decay",
+                        "optimizer", "warmup_epochs", "warmup_momentum", "warmup_bias_lr",
+                        "fliplr", "flipud", "degrees", "translate", "scale", "shear",
+                        "perspective", "hsv_h", "hsv_s", "hsv_v", "mosaic", "mixup",
+                        "copy_paste", "amp", "save_period", "plots", "verbose"):
+                if key in config:
+                    extra_params[key] = config[key]
+
         model = YOLO(model_base)
 
-        # Train
-        # Note: We assume that the user wants to see the progress. 
-        # Ultralytics doesn't easily plug into Gradio progress bar without custom callbacks,
-        # but the verbose output will be printed to console.
         results = model.train(
             data=str(data_yaml),
             epochs=epochs,
             batch=batch_size,
-            imgsz=640,
-            project=str(PROJECT_ROOT / "runs" / "train"),
-            verbose=True
+            project=str(RUNS_DIR),
+            **extra_params,
         )
 
-        return f"✅ **Training completed!**\n\nResults saved to: `{results.save_dir}`"
+        return f"Training completed!\n\nResults saved to: {results.save_dir}"
 
     except RuntimeError as e:
         if "CUDA out of memory" in str(e):
-            return f"❌ **Out of GPU memory!**\n\nTry reducing batch size to {batch_size // 2}."
-        return f"❌ Runtime error: {str(e)}"
+            suggested = max(1, batch_size // 2) if batch_size > 0 else 4
+            return f"Out of GPU memory. Try batch size {suggested}."
+        return f"Runtime error: {e}"
     except Exception as e:
-        return f"❌ Error during training: {str(e)}"
+        return f"Error during training: {e}"
 
 
 def get_training_status():
-    """Get training status."""
-    runs_dir = PROJECT_ROOT / "runs" / "train"
-    if not runs_dir.exists():
-        return "No previous trainings"
+    """List recent training runs."""
+    if not RUNS_DIR.exists():
+        return "No previous trainings."
 
-    experiments = sorted(runs_dir.glob("*/"), reverse=True)
+    experiments = sorted(RUNS_DIR.glob("*/"), reverse=True)
     if not experiments:
-        return "No previous trainings"
+        return "No previous trainings."
 
     status = "## Previous Trainings\n\n"
     for exp in experiments[:5]:
         status += f"- `{exp.name}`\n"
-
-        # Find metrics
         results_csv = exp / "results.csv"
         if results_csv.exists():
-            import csv
             with open(results_csv) as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
+                rows = list(csv.DictReader(f))
                 if rows:
-                    last = rows[-1]
                     status += f"  - Epochs: {len(rows)}\n"
 
     return status
 
+
 def get_training_metrics():
-    """Read metrics from last training (Hardcoded for demo purposes as in original app.py)."""
-    # Ideally this should read from the latest run, but preserving original logic for now
-    metrics = """
-## Final Model Results (Training #4)
+    """Read metrics from the latest training run dynamically."""
+    if not RUNS_DIR.exists():
+        return "No training runs found. Train a model first."
+
+    experiments = sorted(RUNS_DIR.glob("*/"), reverse=True)
+    if not experiments:
+        return "No training runs found. Train a model first."
+
+    # Find latest run with results.csv
+    for exp in experiments:
+        results_csv = exp / "results.csv"
+        if not results_csv.exists():
+            continue
+
+        with open(results_csv) as f:
+            rows = list(csv.DictReader(f))
+        if not rows:
+            continue
+
+        last = rows[-1]
+
+        # Ultralytics CSV column names (strip whitespace)
+        clean = {k.strip(): v.strip() for k, v in last.items()}
+
+        # Extract metrics (column names vary slightly across versions)
+        def get_metric(keys, fmt=".3f"):
+            for k in keys:
+                if k in clean:
+                    try:
+                        val = float(clean[k])
+                        return f"{val:{fmt}}"
+                    except ValueError:
+                        pass
+            return "N/A"
+
+        precision = get_metric(["metrics/precision(B)", "metrics/precision"])
+        recall = get_metric(["metrics/recall(B)", "metrics/recall"])
+        map50 = get_metric(["metrics/mAP50(B)", "metrics/mAP50"])
+        map50_95 = get_metric(["metrics/mAP50-95(B)", "metrics/mAP50-95"])
+
+        gpu = detect_gpu()
+        hw = get_hardware_summary(gpu)
+
+        return f"""## Latest Training: `{exp.name}`
 
 | Metric | Value |
 |--------|-------|
-| **mAP@50** | 98.7% |
-| **mAP@50-95** | 87.4% |
-| **Precision** | 91.7% |
-| **Recall** | 99.2% |
+| Precision | {precision} |
+| Recall | {recall} |
+| mAP@50 | {map50} |
+| mAP@50-95 | {map50_95} |
+| Epochs | {len(rows)} |
 
-## Inference Benchmark (RTX 2060)
-
-| Format | Speed | FPS | Speedup |
-|--------|-------|-----|---------|
-| PyTorch (.pt) | 14.0 ms | 71 | 1x |
-| ONNX (.onnx) | 19.4 ms | 52 | 0.7x |
-| **TensorRT FP16** | **5.5 ms** | **180** | **2.5x** |
-
-## Dataset
-
-- **Training:** 621 images
-- **Validation:** 139 images
-- **Classes:** 1 (pillar)
+{hw}
 """
-    return metrics
+
+    return "No results.csv found in any training run."

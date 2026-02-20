@@ -198,12 +198,13 @@ class AutoAnnotator:
                     except OSError:
                         shutil.copy2(img_path, img_dest)
 
-        # Create dataset.yaml
+        # Create dataset.yaml — derive class name from the prompt
+        class_name = prompt.rstrip(".").strip().split(",")[0].strip()[:40]
         yaml_content = {
             'path': str(output_path.absolute()),
             'train': 'images/train',
             'val': 'images/val',
-            'names': {0: 'pillar'},
+            'names': {0: class_name},
         }
         yaml_path = output_path / 'dataset.yaml'
         with open(yaml_path, 'w') as f:

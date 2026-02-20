@@ -1,20 +1,13 @@
-from pathlib import Path
+"""Performance benchmarking for model formats."""
+
 import numpy as np
+
 try:
     import gradio as gr
 except ImportError:
     gr = None
 
-PROJECT_ROOT = Path(__file__).parent.parent
-MODELS_DIR = PROJECT_ROOT / "models"
-
-def find_available_models():
-    """Find all available models."""
-    models = []
-    if MODELS_DIR.exists():
-        for ext in ["*.engine", "*.pt", "*.onnx"]:
-            models.extend(MODELS_DIR.glob(ext))
-    return sorted(models, key=lambda x: x.suffix != ".engine")  # TensorRT first
+from src.inference import find_available_models
 
 
 def run_benchmark(iterations, progress=gr.Progress() if gr else None):

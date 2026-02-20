@@ -1,37 +1,56 @@
+from collections import Counter
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent
+from src.project import PROJECT_ROOT
+
 DATA_DIR = PROJECT_ROOT / "data"
 
-def get_dataset_stats():
-    """Get statistics about the current dataset."""
-    dataset_dir = DATA_DIR / "dataset"
+
+def get_dataset_stats(dataset_dir: Path | None = None):
+    """Get statistics about a dataset directory.
+
+    Accepts either a directory with train/val splits (YOLO layout)
+    or falls back to data/dataset/.
+    """
+    dataset_dir = dataset_dir or (DATA_DIR / "dataset")
     if not dataset_dir.exists():
-        return "No dataset found at data/dataset/"
+        return "No dataset found."
 
     stats = "## Dataset Statistics\n\n"
 
-    for split in ['train', 'val']:
-        images_dir = dataset_dir / split / 'images'
-        labels_dir = dataset_dir / split / 'labels'
+    for split in ["train", "val"]:
+        images_dir = dataset_dir / split / "images"
+        labels_dir = dataset_dir / split / "labels"
+
+        if not images_dir.exists():
+            # Also try flat layout: dataset_dir/images/train
+            images_dir = dataset_dir / "images" / split
+            labels_dir = dataset_dir / "labels" / split
 
         if images_dir.exists():
             images = list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.png"))
             labels = list(labels_dir.glob("*.txt")) if labels_dir.exists() else []
 
-            # Count annotations
             total_annotations = 0
+            class_counts: Counter = Counter()
             for label_file in labels:
                 content = label_file.read_text().strip()
                 if content:
-                    total_annotations += len(content.split('\n'))
+                    lines = content.split("\n")
+                    total_annotations += len(lines)
+                    for line in lines:
+                        parts = line.strip().split()
+                        if parts:
+                            class_counts[parts[0]] += 1
 
             stats += f"### {split.capitalize()}\n"
             stats += f"- Images: {len(images)}\n"
             stats += f"- Labels: {len(labels)}\n"
             stats += f"- Total annotations: {total_annotations}\n"
             if len(images) > 0:
-                stats += f"- Avg annotations/image: {total_annotations/len(images):.2f}\n"
+                stats += f"- Avg annotations/image: {total_annotations / len(images):.2f}\n"
+            if class_counts:
+                stats += f"- Class distribution: {dict(class_counts)}\n"
             stats += "\n"
 
     return stats
