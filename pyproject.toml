@@ -1,0 +1,68 @@
+[project]
+name = "fine-tuning-studio"
+version = "1.0.0"
+description = "Universal fine-tuning framework for computer vision with YOLO"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+dependencies = [
+    # Core
+    "ultralytics>=8.4.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+
+    # Vision
+    "opencv-python>=4.8.0",
+    "Pillow>=10.0.0",
+
+    # Data
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "PyYAML>=6.0",
+    "tqdm>=4.66.0",
+
+    # UI
+    "gradio>=5.0.0",
+
+    # Visualization
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "tensorboard>=2.14.0",
+]
+
+[project.optional-dependencies]
+# Zero-shot auto-annotation with Grounding DINO
+annotation = [
+    "transformers>=4.40.0",
+]
+
+# Dataset tools (Open Images, Roboflow)
+datasets = [
+    "fiftyone>=1.0.0",
+    "roboflow>=1.1.0",
+]
+
+# Development and testing
+dev = [
+    "pytest>=7.4.0",
+]
+
+# All optional dependencies
+all = [
+    "fine-tuning-studio[annotation,datasets,dev]",
+]
+
+[project.scripts]
+fts-train = "scripts.train:main"
+fts-inference = "scripts.inference:main"
+fts-benchmark = "scripts.benchmark:main"
+fts-export = "scripts.export_tensorrt:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

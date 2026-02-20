@@ -62,9 +62,11 @@ fine-tuning/
 ├── data/                        # Datasets (gestionados por usuario)
 ├── models/                      # Modelos entrenados (.pt, .onnx, .engine)
 ├── runs/                        # Logs de entrenamiento
+├── pyproject.toml               # Dependencias (uv)
 └── docs/                        # Documentacion
     ├── HITOS.md                 # Roadmap y fases del proyecto
     ├── ZERO_SHOT_GUIDE.md       # Guia de auto-anotacion zero-shot
+    ├── learning/                # Guias paso a paso
     └── archive/                 # Documentacion historica (VR project)
 ```
 
@@ -75,15 +77,19 @@ fine-tuning/
 git clone https://github.com/robertteleng/fine-tuning.git
 cd fine-tuning
 
-# Entorno virtual
-python3 -m venv .venv
-source .venv/bin/activate
+# Instalar uv (gestor de paquetes rapido)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Dependencias
-pip install -r requirements.txt
+# Instalar dependencias (crea .venv automaticamente)
+uv sync
 
 # Verificar GPU
-python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, GPU: {torch.cuda.get_device_name(0)}')"
+uv run python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, GPU: {torch.cuda.get_device_name(0)}')"
+
+# Extras opcionales
+uv sync --extra annotation   # Grounding DINO (auto-anotacion zero-shot)
+uv sync --extra datasets      # FiftyOne + Roboflow (descarga de datasets)
+uv sync --extra all            # Todo
 ```
 
 ## Uso
@@ -101,7 +107,7 @@ python app.py
 
 ```bash
 # Entrenamiento
-python scripts/train.py
+uv run python scripts/train.py
 
 # Inferencia
 python scripts/inference.py --source imagen.jpg
@@ -145,6 +151,7 @@ La GPU se auto-detecta y los defaults se ajustan automaticamente.
 - **UI:** Gradio
 - **Anotacion:** Template Matching + Grounding DINO (zero-shot)
 - **Export:** TensorRT FP16, ONNX
+- **Entorno:** uv (gestor de paquetes)
 - **Testing:** pytest
 
 ## Historial del Proyecto
