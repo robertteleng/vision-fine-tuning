@@ -40,14 +40,20 @@ def export_model(args):
     if args.model:
         model_path = Path(args.model)
         if not model_path.exists():
-            logger.error(f"Model not found: {args.model}")
-            sys.exit(1)
+            # Check models/ directory
+            alt_path = PROJECT_ROOT / "models" / args.model
+            if alt_path.exists():
+                model_path = alt_path
+            else:
+                logger.error(f"Model not found: {args.model}")
+                sys.exit(1)
     else:
         model_path = find_best_model()
         if not model_path:
-            runs_dir = PROJECT_ROOT / "runs" / "train"
+            # Search all runs subdirectories for best.pt
+            runs_dir = PROJECT_ROOT / "runs"
             if runs_dir.exists():
-                bests = sorted(runs_dir.glob("*/weights/best.pt"), reverse=True)
+                bests = sorted(runs_dir.rglob("weights/best.pt"), key=lambda p: p.stat().st_mtime, reverse=True)
                 if bests:
                     model_path = bests[0]
             if not model_path:
