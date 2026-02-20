@@ -265,7 +265,7 @@ Entrenar con:
 
     python scripts/train.py \\
         --data {yaml_path} \\
-        --model yolo12n.pt \\
+        --model yolo26m.pt \\
         --epochs 100 \\
         --batch 16
 """)

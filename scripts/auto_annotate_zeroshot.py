@@ -14,7 +14,7 @@ CÓMO FUNCIONA:
 Ejemplo de uso:
     python scripts/auto_annotate_zeroshot.py \
         --source data/video_frames/ \
-        --prompts "yellow checkered pillar" \
+        --prompts "your object description" \
         --output data/dataset_zeroshot/ \
         --conf 0.3
 """
@@ -43,20 +43,20 @@ Ejemplos:
   # Detectar un tipo de objeto:
   python scripts/auto_annotate_zeroshot.py \\
       --source data/video_frames/ \\
-      --prompts "yellow checkered pillar" \\
+      --prompts "your object description" \\
       --output data/dataset_zeroshot/
 
   # Detectar múltiples objetos:
   python scripts/auto_annotate_zeroshot.py \\
       --source data/video_frames/ \\
-      --prompts "yellow pillar" "blue box" "orange cone" \\
+      --prompts "car" "person" "traffic light" \\
       --output data/dataset_zeroshot/ \\
       --conf 0.25
 
   # Usar modelo más grande para mejor precisión:
   python scripts/auto_annotate_zeroshot.py \\
       --source data/video_frames/ \\
-      --prompts "yellow checkered pillar" \\
+      --prompts "your object description" \\
       --model yolov8l-worldv2.pt \\
       --conf 0.2
         """
@@ -390,14 +390,14 @@ Para entrenar con estas anotaciones:
 
     python scripts/train.py \\
         --data {yaml_path} \\
-        --model yolo12n.pt \\
+        --model yolo26m.pt \\
         --epochs 100 \\
         --batch 16
 
 O directamente con Ultralytics:
 
     from ultralytics import YOLO
-    model = YOLO('yolo12n.pt')
+    model = YOLO('yolo26m.pt')
     model.train(data='{yaml_path}', epochs=100, batch=16)
 """)
 

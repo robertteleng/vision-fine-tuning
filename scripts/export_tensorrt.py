@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """
-Exportación de modelo YOLO a TensorRT para inferencia optimizada.
+Export script — Fine-Tuning Studio
 
-Formatos disponibles:
-- engine: TensorRT (NVIDIA GPUs, más rápido)
-- onnx: ONNX (portable)
-- torchscript: TorchScript
+Export YOLO models to TensorRT, ONNX, and other formats.
 
-Uso:
-    python scripts/export_tensorrt.py
+Usage:
     python scripts/export_tensorrt.py --format engine --half
-    python scripts/export_tensorrt.py --model runs/train/exp/weights/best.pt
+    python scripts/export_tensorrt.py --format onnx
+    python scripts/export_tensorrt.py --model models/best.pt --format engine
 """
 
 import argparse
@@ -21,179 +18,120 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.inference import find_best_model
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s | %(levelname)-8s | %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(asctime)s | %(levelname)-8s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
 
-def find_best_model() -> Path:
-    """Busca el mejor modelo disponible."""
-    models_dir = PROJECT_ROOT / 'models'
-    if models_dir.exists():
-        versioned_models = sorted(models_dir.glob('vr_boxes_*.pt'), reverse=True)
-        if versioned_models:
-            return versioned_models[0]
-
-    runs_dir = PROJECT_ROOT / 'runs' / 'train'
-    if runs_dir.exists():
-        experiments = sorted(runs_dir.glob('*/weights/best.pt'), reverse=True)
-        if experiments:
-            return experiments[0]
-
-    raise FileNotFoundError("No se encontró ningún modelo entrenado.")
-
-
 def export_model(args):
-    """Exporta el modelo al formato especificado."""
+    """Export model to the specified format."""
     from ultralytics import YOLO
     import torch
 
-    # Verificar CUDA para TensorRT
-    if args.format == 'engine' and not torch.cuda.is_available():
-        logger.error("TensorRT requiere GPU NVIDIA con CUDA")
+    if args.format == "engine" and not torch.cuda.is_available():
+        logger.error("TensorRT requires an NVIDIA GPU with CUDA.")
         sys.exit(1)
 
-    # Cargar modelo
     if args.model:
         model_path = Path(args.model)
         if not model_path.exists():
-            logger.error(f"Modelo no encontrado: {args.model}")
+            logger.error(f"Model not found: {args.model}")
             sys.exit(1)
     else:
-        try:
-            model_path = find_best_model()
-        except FileNotFoundError as e:
-            logger.error(str(e))
-            sys.exit(1)
+        model_path = find_best_model()
+        if not model_path:
+            runs_dir = PROJECT_ROOT / "runs" / "train"
+            if runs_dir.exists():
+                bests = sorted(runs_dir.glob("*/weights/best.pt"), reverse=True)
+                if bests:
+                    model_path = bests[0]
+            if not model_path:
+                logger.error("No model found. Train one first or use --model.")
+                sys.exit(1)
 
-    logger.info(f"Modelo a exportar: {model_path}")
+    logger.info(f"Model: {model_path}")
     model = YOLO(str(model_path))
 
-    # Info del formato
     format_info = {
-        'engine': 'TensorRT (optimizado para NVIDIA GPUs)',
-        'onnx': 'ONNX (formato portable)',
-        'torchscript': 'TorchScript (PyTorch nativo)',
-        'openvino': 'OpenVINO (Intel)',
-        'coreml': 'CoreML (Apple)',
-        'tflite': 'TensorFlow Lite (móviles)',
+        "engine": "TensorRT (NVIDIA GPU optimized)",
+        "onnx": "ONNX (portable)",
+        "torchscript": "TorchScript",
+        "openvino": "OpenVINO (Intel)",
+        "coreml": "CoreML (Apple)",
+        "tflite": "TensorFlow Lite (mobile)",
     }
 
     logger.info("=" * 60)
-    logger.info(f"EXPORTANDO A: {format_info.get(args.format, args.format)}")
+    logger.info(f"EXPORTING TO: {format_info.get(args.format, args.format)}")
     logger.info("=" * 60)
 
     export_args = {
-        'format': args.format,
-        'imgsz': args.imgsz,
-        'half': args.half,
-        'dynamic': args.dynamic,
-        'simplify': True,
-        'verbose': True,
+        "format": args.format,
+        "imgsz": args.imgsz,
+        "half": args.half,
+        "dynamic": args.dynamic,
+        "simplify": True,
+        "verbose": True,
     }
 
-    # Opciones específicas de TensorRT
-    if args.format == 'engine':
-        export_args['device'] = 0
+    if args.format == "engine":
+        export_args["device"] = 0
         if args.workspace:
-            export_args['workspace'] = args.workspace
-        logger.info(f"  Precisión: {'FP16' if args.half else 'FP32'}")
-        logger.info(f"  Tamaño imagen: {args.imgsz}")
+            export_args["workspace"] = args.workspace
+        logger.info(f"  Precision: {'FP16' if args.half else 'FP32'}")
+        logger.info(f"  Image size: {args.imgsz}")
 
-    # Exportar
     try:
         export_path = model.export(**export_args)
         logger.info("\n" + "=" * 60)
-        logger.info("EXPORTACIÓN COMPLETADA")
+        logger.info("EXPORT COMPLETE")
         logger.info("=" * 60)
-        logger.info(f"Modelo exportado: {export_path}")
+        logger.info(f"Exported to: {export_path}")
 
-        # Mostrar tamaño
         export_file = Path(export_path)
         if export_file.exists():
             size_mb = export_file.stat().st_size / (1024 * 1024)
-            logger.info(f"Tamaño: {size_mb:.1f} MB")
+            logger.info(f"Size: {size_mb:.1f} MB")
 
-        # Instrucciones de uso
-        logger.info("\nPara usar el modelo exportado:")
-        if args.format == 'engine':
-            logger.info(f"  python scripts/inference.py --source video.mp4 --model {export_path}")
-        elif args.format == 'onnx':
-            logger.info(f"  from ultralytics import YOLO")
-            logger.info(f"  model = YOLO('{export_path}')")
-            logger.info(f"  results = model('imagen.jpg')")
+        logger.info(f"\nUsage:")
+        logger.info(f"  python scripts/inference.py --source image.jpg --model {export_path}")
+        logger.info(f"  python scripts/benchmark.py --model {model_path}")
 
         return export_path
 
     except Exception as e:
-        logger.error(f"Error en exportación: {e}")
+        logger.error(f"Export error: {e}")
         sys.exit(1)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Exportar modelo YOLO a TensorRT u otros formatos',
+        description="Fine-Tuning Studio — Export",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Ejemplos:
-  # Exportar a TensorRT FP16 (recomendado para producción)
-  python scripts/export_tensorrt.py --format engine --half
-
-  # Exportar a ONNX
-  python scripts/export_tensorrt.py --format onnx
-
-  # Exportar modelo específico
-  python scripts/export_tensorrt.py --model models/best.pt --format engine
-        """
+Examples:
+  python scripts/export_tensorrt.py --format engine --half    # TensorRT FP16
+  python scripts/export_tensorrt.py --format onnx             # ONNX
+  python scripts/export_tensorrt.py --model models/best.pt    # Specific model
+""",
     )
 
-    parser.add_argument(
-        '--model', '-m',
-        type=str,
-        default=None,
-        help='Ruta al modelo .pt'
-    )
-
-    parser.add_argument(
-        '--format', '-f',
-        type=str,
-        default='engine',
-        choices=['engine', 'onnx', 'torchscript', 'openvino', 'coreml', 'tflite'],
-        help='Formato de exportación (default: engine/TensorRT)'
-    )
-
-    parser.add_argument(
-        '--imgsz',
-        type=int,
-        default=640,
-        help='Tamaño de imagen (default: 640)'
-    )
-
-    parser.add_argument(
-        '--half',
-        action='store_true',
-        help='Exportar en FP16 (reduce tamaño, más rápido)'
-    )
-
-    parser.add_argument(
-        '--dynamic',
-        action='store_true',
-        help='Permitir tamaños de entrada dinámicos'
-    )
-
-    parser.add_argument(
-        '--workspace',
-        type=int,
-        default=4,
-        help='Workspace de TensorRT en GB (default: 4)'
-    )
-
+    parser.add_argument("--model", "-m", default=None, help="Model .pt path")
+    parser.add_argument("--format", "-f", default="engine",
+                        choices=["engine", "onnx", "torchscript", "openvino", "coreml", "tflite"],
+                        help="Export format (default: engine/TensorRT)")
+    parser.add_argument("--imgsz", type=int, default=640, help="Image size")
+    parser.add_argument("--half", action="store_true", help="FP16 precision")
+    parser.add_argument("--dynamic", action="store_true", help="Dynamic input shapes")
+    parser.add_argument("--workspace", type=int, default=4, help="TensorRT workspace GB")
     args = parser.parse_args()
     export_model(args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

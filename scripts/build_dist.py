@@ -14,7 +14,7 @@ import shutil
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
-DIST_DIR = PROJECT_ROOT / "dist" / "VR-Pillar-Detector"
+DIST_DIR = PROJECT_ROOT / "dist" / "Fine-Tuning-Studio"
 
 # Files to include in distribution
 DIST_FILES = [
@@ -29,7 +29,7 @@ DIST_FILES = [
     ("dist/README.md", "README.md"),
 
     # Data config
-    ("data/pillar.yaml", "data/pillar.yaml"),
+    # Dataset YAML (user provides their own)
 ]
 
 # Folders to include
@@ -79,9 +79,9 @@ def create_dist():
 
 def create_zip():
     """Create ZIP file from dist folder."""
-    zip_path = PROJECT_ROOT / "dist" / "VR-Pillar-Detector"
+    zip_path = PROJECT_ROOT / "dist" / "Fine-Tuning-Studio"
     print(f"Creating {zip_path}.zip...")
-    shutil.make_archive(str(zip_path), "zip", DIST_DIR.parent, "VR-Pillar-Detector")
+    shutil.make_archive(str(zip_path), "zip", DIST_DIR.parent, "Fine-Tuning-Studio")
 
     # Show size
     zip_file = Path(f"{zip_path}.zip")
@@ -95,7 +95,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 50)
-    print("  VR Pillar Detector - Build Distribution")
+    print("  Fine-Tuning Studio - Build Distribution")
     print("=" * 50)
     print()
 
