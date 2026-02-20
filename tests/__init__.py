@@ -1,1 +1,1 @@
-# Tests for VR Pillar Detector
+# Tests for Fine-Tuning Studio
