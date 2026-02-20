@@ -41,6 +41,8 @@ fine-tuning/
 ├── app.py                       # Interfaz Gradio (Fine-Tuning Studio)
 ├── config.yaml                  # Configuracion de entrenamiento
 ├── src/                         # Modulos de logica de negocio
+│   ├── hardware.py              # Auto-deteccion de GPU y defaults
+│   ├── project.py               # Registro de modelos y config de proyecto
 │   ├── inference.py             # Carga de modelos e inferencia
 │   ├── training.py              # Rutinas de entrenamiento YOLO
 │   ├── dataset.py               # Gestion y validacion de datasets
@@ -56,7 +58,7 @@ fine-tuning/
 │   ├── benchmark.py             # Comparar formatos
 │   ├── evaluate.py              # Evaluacion del modelo
 │   └── export_tensorrt.py       # Exportar a TensorRT/ONNX
-├── tests/                       # Suite de tests (47 tests)
+├── tests/                       # Suite de tests
 ├── data/                        # Datasets (gestionados por usuario)
 ├── models/                      # Modelos entrenados (.pt, .onnx, .engine)
 ├── runs/                        # Logs de entrenamiento
@@ -143,7 +145,7 @@ La GPU se auto-detecta y los defaults se ajustan automaticamente.
 - **UI:** Gradio
 - **Anotacion:** Template Matching + Grounding DINO (zero-shot)
 - **Export:** TensorRT FP16, ONNX
-- **Testing:** pytest (47 tests)
+- **Testing:** pytest
 
 ## Historial del Proyecto
 

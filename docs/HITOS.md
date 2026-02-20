@@ -9,18 +9,18 @@ Transformacion del proyecto de detector VR-especifico a framework universal de f
 | Fase | Descripcion | Estado |
 |------|-------------|--------|
 | 0 | Renombrar directorio local | Completado |
-| 1 | `src/hardware.py` — Auto-deteccion de GPU | Pendiente |
-| 2 | `src/project.py` — Sistema de proyectos | Pendiente |
+| 1 | `src/hardware.py` — Auto-deteccion de GPU | Completado |
+| 2 | `src/project.py` — Sistema de proyectos | Completado |
 | 3 | Reescribir `config.yaml` | Completado |
-| 4 | Reescribir `src/training.py` | Pendiente |
-| 5 | Reescribir `src/inference.py` | Pendiente |
-| 6 | Reescribir `src/annotation.py` | Pendiente |
-| 7 | Reescribir `src/dataset.py` y `src/benchmark.py` | Pendiente |
-| 8 | Reescribir `app.py` (Fine-Tuning Studio) | Pendiente |
-| 9 | Reescribir `scripts/` | Pendiente |
-| 10 | Reescribir `tests/` | Pendiente |
+| 4 | Reescribir `src/training.py` | Completado |
+| 5 | Reescribir `src/inference.py` | Completado |
+| 6 | Reescribir `src/annotation.py` | Completado |
+| 7 | Reescribir `src/dataset.py` y `src/benchmark.py` | Completado |
+| 8 | Reescribir `app.py` (Fine-Tuning Studio) | Completado |
+| 9 | Reescribir `scripts/` | Completado |
+| 10 | Reescribir `tests/` | Completado |
 | 11 | Reescribir documentacion | Completado |
-| 12 | Centralizar `find_best_model()` | Pendiente |
+| 12 | Centralizar `find_best_model()` | Completado |
 
 ---
 
@@ -32,28 +32,21 @@ Transformacion del proyecto de detector VR-especifico a framework universal de f
 
 ---
 
-## Fase 1: `src/hardware.py` — Auto-deteccion de GPU
+## Fase 1: `src/hardware.py` — Completado
 
-Nuevo modulo para detectar GPU automaticamente y sugerir defaults optimos.
-
-**Funciones:**
-- `detect_gpu()` — Retorna info de la GPU (nombre, VRAM, CUDA)
-- `suggest_training_defaults()` — Sugiere batch, workers, cache, imgsz segun GPU
-- `get_hardware_summary()` — Resumen legible para mostrar en UI
-
-**Elimina:** Todas las referencias hardcoded a GPUs especificas.
+- `detect_gpu()` — GPUInfo dataclass con nombre, VRAM, CUDA
+- `suggest_training_defaults()` — batch/workers/cache/imgsz segun VRAM
+- `get_hardware_summary()` — Resumen para UI
+- Elimina todas las refs hardcoded a GPUs
 
 ---
 
-## Fase 2: `src/project.py` — Sistema de proyectos
+## Fase 2: `src/project.py` — Completado
 
-Sistema de configuracion por proyecto con registro de modelos YOLO.
-
-**Funciones:**
-- Registro de modelos: YOLO v8, v11, v12, 26 x (n,s,m,l,x) x (detect,segment,classify,pose,obb)
-- `ProjectConfig` dataclass con dataset, modelo, hiperparametros
-- `get_models_for_task(task)` — Lista modelos disponibles para una tarea
-- Directorio `projects/` para almacenar configuraciones
+- Registro YOLO: v8, v11, v12, 26 x (n,s,m,l,x) x (detect,segment,classify,pose,obb)
+- `ProjectConfig` dataclass con `from_yaml()`
+- `get_models_for_task(task)` y `get_task_for_model(name)`
+- `find_dataset_yamls()` para auto-discovery
 
 ---
 
@@ -66,96 +59,75 @@ Sistema de configuracion por proyecto con registro de modelos YOLO.
 
 ---
 
-## Fase 4: Reescribir `src/training.py`
+## Fase 4: Reescribir `src/training.py` — Completado
 
-- Eliminar metricas hardcoded
-- Eliminar dataset paths hardcoded
-- Leer metricas dinamicamente de `results.csv`
-- Integrar auto-deteccion de GPU de `src/hardware.py`
-
----
-
-## Fase 5: Reescribir `src/inference.py`
-
-- Cambiar mensajes especificos a genericos
-- Soporte multi-tarea (detect/segment/classify/pose/obb)
-- Centralizar `find_best_model()` (usado en 4 scripts)
+- Metricas leidas dinamicamente de `results.csv`
+- Dataset YAML como parametro (no hardcoded)
+- Integra `src/hardware.py` para GPU info
+- Lee params de `config.yaml` automaticamente
 
 ---
 
-## Fase 6: Reescribir `src/annotation.py`
+## Fase 5: Reescribir `src/inference.py` — Completado
 
-- Eliminar class names hardcoded
-- Clases derivadas del prompt dinamicamente
-
----
-
-## Fase 7: Reescribir `src/dataset.py` y `src/benchmark.py`
-
-- Agregar analisis de distribucion de clases
-- `benchmark.py` ya es casi generico, ajustes menores
+- Mensajes genericos, sin refs VR
+- `find_best_model()` canonico (TensorRT > PyTorch > ONNX)
+- `find_available_models()` centralizado
 
 ---
 
-## Fase 8: Reescribir `app.py` — Fine-Tuning Studio
+## Fase 6: Reescribir `src/annotation.py` — Completado
+
+- Clase derivada del prompt dinamicamente (no hardcoded "pillar")
+
+---
+
+## Fase 7: Reescribir `src/dataset.py` y `src/benchmark.py` — Completado
+
+- `get_dataset_stats()` con distribucion de clases
+- `benchmark.py` importa `find_available_models` de inference
+
+---
+
+## Fase 8: Reescribir `app.py` — Completado
 
 - Titulo: "Fine-Tuning Studio"
 - Selector de tarea (detect/segment/classify/pose/obb)
 - Selector dinamico de modelos segun tarea
-- Display de hardware auto-detectado
-- Eliminar refs VR/pillar
+- Hardware auto-detectado en UI
+- Sin refs VR/pillar
 
 ---
 
-## Fase 9: Reescribir `scripts/`
+## Fase 9: Reescribir `scripts/` — Completado
 
-- Eliminar naming especifico -> naming generico
-- Auto-detect dataset YAML
-- Actualizar docstrings y ejemplos
+- Naming generico en todos los scripts
+- Auto-detect dataset YAML con `find_dataset_yamls()`
+- `find_best_model()` importado de `src.inference`
+- Docstrings y ejemplos actualizados
 
 ---
 
-## Fase 10: Reescribir `tests/`
+## Fase 10: Reescribir `tests/` — Completado
 
-- Eliminar tests especificos de datasets hardcoded
-- Agregar `tests/test_hardware.py`
-- Agregar `tests/test_project.py`
+- Tests para `src/hardware.py` y `src/project.py`
+- Test de no-hardcoding: verifica que no quedan refs VR/pillar
+- 15 tests passing, 2 skipped (sin models/ y sin Grounding DINO)
 
 ---
 
 ## Fase 11: Reescribir documentacion — Completado
 
 - README.md universal
-- HITOS.md como roadmap de fases
-- Docs VR-especificos archivados en `docs/archive/`
-- `ZERO_SHOT_GUIDE.md` conservado (ya es generico)
+- HITOS.md con todas las fases completadas
+- Docs VR archivados en `docs/archive/`
 
 ---
 
-## Fase 12: Centralizar `find_best_model()`
+## Fase 12: Centralizar `find_best_model()` — Completado
 
-`find_best_model()` esta duplicada en 4 scripts. Mover a `src/inference.py` como funcion canonica e importar en los demas.
-
----
-
-## Auditoria de Hardcoding
-
-| Archivo | Refs VR/Pillar | Refs Hardware | Total |
-|---------|---------------|---------------|-------|
-| app.py | 12+ | 5+ | 17+ |
-| config.yaml | 8+ | 20+ | 28+ |
-| scripts/train.py | 6+ | 5+ | 11+ |
-| src/training.py | 5+ | 2+ | 7+ |
-| src/annotation.py | 2 | 0 | 2 |
-| src/inference.py | 1 | 0 | 1 |
-| tests/test_integration.py | 4 | 0 | 4 |
-
-**Totales:**
-- 40+ refs a "pillar", "vr_box", "VR Pillar Detector"
-- 20+ refs a hardware especifico
-- 12+ metricas hardcoded
-- 15+ paths hardcoded
-- 6+ class names/counts hardcoded
+- `find_best_model()` canonico en `src/inference.py`
+- Scripts importan de ahi en vez de duplicar
 
 ---
 
