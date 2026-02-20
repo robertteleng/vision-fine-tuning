@@ -5,10 +5,12 @@ Training script — Fine-Tuning Studio
 Fine-tune YOLO models on custom datasets.
 
 Usage:
-    python scripts/train.py                          # Use config.yaml defaults
-    python scripts/train.py --config my_config.yaml
+    python scripts/train.py                                    # Use config.yaml defaults
+    python scripts/train.py --model yolo26s.pt                 # Small (Jetson, edge)
+    python scripts/train.py --model yolo26m.pt                 # Medium (desktop GPU)
+    python scripts/train.py --model yolo26l.pt                 # Large (server GPU)
+    python scripts/train.py --data data/my_dataset/dataset.yaml
     python scripts/train.py --epochs 50 --batch 16
-    python scripts/train.py --data data/my_dataset.yaml
 """
 
 import sys
@@ -66,6 +68,9 @@ def train(args):
     config = load_config(args.config)
 
     # CLI overrides
+    if args.model:
+        config["model"] = args.model
+        logger.info(f"Override: model = {args.model}")
     for key in ("epochs", "batch", "imgsz"):
         val = getattr(args, key, None)
         if val is not None:
@@ -92,6 +97,10 @@ def train(args):
     from ultralytics import YOLO
 
     model_name = config.get("model", "yolo26m.pt")
+    # Check models/ directory first, then fall back to Ultralytics auto-download
+    model_path = PROJECT_ROOT / "models" / model_name
+    if model_path.exists():
+        model_name = str(model_path)
     logger.info(f"Base model: {model_name}")
     model = YOLO(model_name)
 
@@ -167,6 +176,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--config", "-c", default=str(PROJECT_ROOT / "config.yaml"), help="Config YAML path")
+    parser.add_argument("--model", "-m", default=None, help="Model override (e.g. yolo26s.pt, yolo26m.pt, yolo26l.pt)")
     parser.add_argument("--data", "-d", default=None, help="Dataset YAML path")
     parser.add_argument("--epochs", "-e", type=int, default=None, help="Epochs override")
     parser.add_argument("--batch", "-b", type=int, default=None, help="Batch size override (-1 = auto)")
