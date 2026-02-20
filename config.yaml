@@ -3,32 +3,32 @@
 # =============================================================================
 # Framework universal para fine-tuning de modelos YOLO.
 # La GPU se auto-detecta; batch: -1 ajusta automaticamente segun VRAM.
+#
+# Uso rapido:
+#   uv run python scripts/train.py                          # defaults (medium)
+#   uv run python scripts/train.py -m yolo26s.pt            # small (Jetson)
+#   uv run python scripts/train.py -m yolo26l.pt            # large (server)
+#   uv run python scripts/train.py -m yolo26s.pt -e 50      # small, 50 epochs
+#
+# El dataset se auto-detecta desde data/ o se especifica con --data.
 # =============================================================================
-
-# -----------------------------------------------------------------------------
-# DATASET
-# -----------------------------------------------------------------------------
-data_dir: "data"
-
-# Numero de clases (ajustar segun tu dataset)
-nc: 1
-
-# Nombres de clases (ajustar segun tu dataset)
-names:
-  0: "object"
 
 # -----------------------------------------------------------------------------
 # MODELO BASE
 # -----------------------------------------------------------------------------
 # YOLO26 (Ultralytics >=8.4.14) — NMS-free, end-to-end
-# Variantes: yolo26n.pt, yolo26s.pt, yolo26m.pt, yolo26l.pt, yolo26x.pt
-# Tareas:    -seg.pt (segmentacion), -cls.pt (clasificacion),
-#            -pose.pt (pose), -obb.pt (oriented bounding boxes)
+# Variantes disponibles (RTX 5060 Ti 16GB, imgsz=640):
+#   yolo26n.pt  — nano    | batch ~24 | ~60s/epoch  | menos precision
+#   yolo26s.pt  — small   | batch ~11 | ~128s/epoch | edge (Jetson Orin)
+#   yolo26m.pt  — medium  | batch ~5  | ~240s/epoch | desktop GPU
+#   yolo26l.pt  — large   | batch ~3  | ~400s/epoch | server GPU (>24GB ideal)
+#   yolo26x.pt  — xlarge  | batch ~2  | ~600s/epoch | server GPU (>32GB ideal)
 #
-# Modelos anteriores tambien soportados: yolov8, yolov11, yolo12
+# Override en CLI: python scripts/train.py --model yolo26s.pt
 model: "yolo26m.pt"
 
-# Tarea de vision (detect, segment, classify, pose, obb)
+# Tarea de vision
+# detect, segment, classify, pose, obb
 task: "detect"
 
 # -----------------------------------------------------------------------------
