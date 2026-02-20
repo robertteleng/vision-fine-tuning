@@ -1,267 +1,115 @@
 # =============================================================================
-# Configuración de Entrenamiento YOLOv8/v11 - Detección de Cajas VR
+# Fine-Tuning Studio — Configuracion de Entrenamiento
 # =============================================================================
-# Este archivo contiene todos los hiperparámetros para el fine-tuning.
-# Los parámetros están optimizados para RTX 2060 (6GB VRAM).
-# Ver comentarios [GPU UPGRADE] para ajustes con RTX 5060 Ti.
+# Framework universal para fine-tuning de modelos YOLO.
+# La GPU se auto-detecta; batch: -1 ajusta automaticamente segun VRAM.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN DEL DATASET
+# DATASET
 # -----------------------------------------------------------------------------
-# Ruta al directorio raíz del dataset (relativa a este archivo o absoluta)
-# Si usas el export de Roboflow directamente, cambia esta ruta al directorio descargado
 data_dir: "data"
 
-# Rutas específicas (se construyen automáticamente en train.py)
-# train: data/train/images
-# val: data/valid/images
-# test: data/test/images
+# Numero de clases (ajustar segun tu dataset)
+nc: 1
 
-# Número de clases a detectar
-nc: 2
-
-# Nombres de las clases (ajusta según tus cajas VR específicas)
-# IMPORTANTE: El orden debe coincidir con las anotaciones de Roboflow
+# Nombres de clases (ajustar segun tu dataset)
 names:
-  0: "vr_box_type_a"    # Ejemplo: Caja de experiencia principal
-  1: "vr_box_type_b"    # Ejemplo: Caja de menú/navegación
+  0: "object"
 
 # -----------------------------------------------------------------------------
 # MODELO BASE
 # -----------------------------------------------------------------------------
-# Opciones disponibles (de menor a mayor tamaño/precisión):
-#   - yolov8n.pt (nano)     ~6 MB   - Recomendado para empezar
-#   - yolov8s.pt (small)    ~22 MB  - Mejor precisión
-#   - yolov8m.pt (medium)   ~52 MB  - Balance precisión/velocidad
-#   - yolov8l.pt (large)    ~87 MB  - Alta precisión
-#   - yolov8x.pt (xlarge)   ~137 MB - Máxima precisión
+# YOLO26 (Ultralytics >=8.4.14) — NMS-free, end-to-end
+# Variantes: yolo26n.pt, yolo26s.pt, yolo26m.pt, yolo26l.pt, yolo26x.pt
+# Tareas:    -seg.pt (segmentacion), -cls.pt (clasificacion),
+#            -pose.pt (pose), -obb.pt (oriented bounding boxes)
 #
-# YOLOv11 (más reciente):
-#   - yolov11n.pt, yolov11s.pt, etc.
-#
-# Para RTX 2060 con dataset pequeño, 'n' o 's' son suficientes
-model: "yolo12s.pt"
+# Modelos anteriores tambien soportados: yolov8, yolov11, yolo12
+model: "yolo26m.pt"
+
+# Tarea de vision (detect, segment, classify, pose, obb)
+task: "detect"
 
 # -----------------------------------------------------------------------------
-# PARÁMETROS DE ENTRENAMIENTO - GPU DEPENDIENTES
+# PARAMETROS GPU-DEPENDIENTES
 # -----------------------------------------------------------------------------
 
-# BATCH SIZE
-# -----------
-# RTX 2060 (6GB):  batch=8 es seguro, batch=16 puede funcionar con imgsz=640
-# RTX 5060 Ti (16GB): batch=32-64 recomendado
-# [GPU UPGRADE] Cambiar a 32 cuando tengas la RTX 5060 Ti
-batch: 8
+# Batch size (-1 = auto-detect segun VRAM disponible)
+batch: -1
 
-# WORKERS (DataLoader)
-# ---------------------
-# Número de procesos para cargar datos en paralelo
-# RTX 2060: 4-8 workers
-# RTX 5060 Ti: 8-12 workers (más CPU cores disponibles típicamente)
-# [GPU UPGRADE] Cambiar a 8-12 según tu CPU
-workers: 4
+# Workers del DataLoader
+workers: 8
 
-# IMAGE SIZE
-# -----------
-# Tamaño de entrada de la red (cuadrado)
-# 640 es el estándar, 1280 para mayor detalle pero más VRAM
-# RTX 2060: 640 recomendado
-# RTX 5060 Ti: 640 o 1280 si necesitas detectar objetos pequeños
-# [GPU UPGRADE] Considera 1280 si las cajas son pequeñas en la imagen
+# Tamano de imagen de entrada
 imgsz: 640
 
-# CACHE
-# ------
-# Cachear imágenes para entrenamiento más rápido
-# Opciones: True (disco), "ram" (memoria), False (sin cache)
-# RTX 2060: False o True (disco) - RAM limitada
-# RTX 5060 Ti: "ram" si tienes suficiente RAM del sistema (>16GB)
-# [GPU UPGRADE] Cambiar a "ram" si tienes >=32GB de RAM
-cache: False
+# Cachear imagenes: "ram", true (disco), false (sin cache)
+# "ram" recomendado si tienes >=32GB RAM de sistema
+cache: "ram"
 
 # -----------------------------------------------------------------------------
-# PARÁMETROS DE ENTRENAMIENTO - GENERALES
+# PARAMETROS DE ENTRENAMIENTO
 # -----------------------------------------------------------------------------
-
-# ÉPOCAS
-# -------
-# Número de pasadas completas por el dataset
-# Para fine-tuning con dataset pequeño: 50-100 épocas
-# Para dataset grande: 100-300 épocas
-# Early stopping se activará si no hay mejora
 epochs: 100
-
-# PACIENCIA (Early Stopping)
-# ---------------------------
-# Número de épocas sin mejora antes de detener el entrenamiento
-# Previene overfitting y ahorra tiempo
 patience: 20
-
-# LEARNING RATE INICIAL
-# ----------------------
-# Tasa de aprendizaje inicial
-# Para fine-tuning (transfer learning): 0.001-0.01
-# El scheduler reducirá esto automáticamente
 lr0: 0.01
-
-# LEARNING RATE FINAL
-# --------------------
-# Tasa de aprendizaje mínima al final del entrenamiento
-# Típicamente 1-10% del lr0
 lrf: 0.01
-
-# MOMENTUM
-# ---------
-# Momento del optimizador SGD
-# 0.937 es el default de YOLO, funciona bien
 momentum: 0.937
-
-# WEIGHT DECAY
-# -------------
-# Regularización L2 para prevenir overfitting
-# 0.0005 es estándar, aumentar a 0.001 si hay overfitting
 weight_decay: 0.0005
+optimizer: "auto"
 
-# WARMUP
-# -------
-# Épocas de calentamiento con learning rate bajo
-# Ayuda a estabilizar el entrenamiento inicial
+# Warmup
 warmup_epochs: 3.0
 warmup_momentum: 0.8
 warmup_bias_lr: 0.1
 
 # -----------------------------------------------------------------------------
-# AUGMENTACIÓN DE DATOS
+# AUGMENTACION
 # -----------------------------------------------------------------------------
-# YOLO aplica augmentación automáticamente durante el entrenamiento
-# Estos parámetros controlan la intensidad
 
-# AUGMENTACIÓN GEOMÉTRICA
-# Probabilidad de flip horizontal
+# Geometrica
 fliplr: 0.5
-
-# Probabilidad de flip vertical (útil si las cajas pueden aparecer invertidas)
 flipud: 0.0
-
-# Grados máximos de rotación
 degrees: 10.0
-
-# Porcentaje máximo de traslación
 translate: 0.1
-
-# Factor máximo de escala
 scale: 0.5
-
-# Grados máximos de shear
 shear: 2.0
-
-# Probabilidad de perspective transform
 perspective: 0.0
 
-# AUGMENTACIÓN DE COLOR (HSV)
-# Variación de Hue (0-1)
+# Color (HSV)
 hsv_h: 0.015
-
-# Variación de Saturación (0-1)
 hsv_s: 0.7
-
-# Variación de Value/Brillo (0-1)
 hsv_v: 0.4
 
-# AUGMENTACIÓN AVANZADA
-# Probabilidad de mosaic augmentation (combina 4 imágenes)
-# Muy efectivo pero desactivar en últimas épocas
+# Avanzada
 mosaic: 1.0
-
-# Probabilidad de mixup (mezcla 2 imágenes)
 mixup: 0.0
-
-# Probabilidad de copy-paste augmentation
 copy_paste: 0.0
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN DE GUARDADO Y LOGGING
+# GUARDADO Y LOGGING
 # -----------------------------------------------------------------------------
-
-# Directorio para guardar resultados
-project: "~/Projects/fine-tuning-vr/runs/train"
-
-# Nombre del experimento (None = auto-incrementa exp, exp2, etc.)
-# Puedes especificar un nombre como "rtx2060_batch8_v1"
+project: "runs/train"
 name: null
-
-# Guardar checkpoint cada N épocas (además de best.pt y last.pt)
 save_period: 10
-
-# Guardar el modelo como .pt (PyTorch) - siempre True
-save: True
-
-# Guardar gráficos de métricas
-plots: True
-
-# Nivel de verbosidad
-verbose: True
+save: true
+plots: true
+verbose: true
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN DE VALIDACIÓN
+# VALIDACION
 # -----------------------------------------------------------------------------
-
-# Realizar validación cada N épocas
-val: True
-
-# Fracción del dataset de validación a usar (1.0 = todo)
-# Reducir para validación más rápida durante desarrollo
+val: true
 val_fraction: 1.0
-
-# IOU threshold para métricas mAP
 iou: 0.7
-
-# Confidence threshold para métricas
 conf: 0.001
 
 # -----------------------------------------------------------------------------
-# OPTIMIZADOR
+# HARDWARE
 # -----------------------------------------------------------------------------
-# Opciones: SGD, Adam, AdamW, NAdam, RAdam, RMSProp, auto
-# SGD: Clásico, bueno para fine-tuning
-# AdamW: Converge más rápido, puede generalizar peor
-# auto: YOLO elige automáticamente
-optimizer: "auto"
-
-# -----------------------------------------------------------------------------
-# CONFIGURACIÓN ESPECÍFICA DE HARDWARE
-# -----------------------------------------------------------------------------
-
-# Device a usar
-# "0" para GPU 0, "0,1" para multi-GPU, "cpu" para CPU
 device: "0"
-
-# AMP (Automatic Mixed Precision)
-# True reduce uso de memoria y acelera entrenamiento en GPUs modernas
-# Funciona en RTX 2060 y superior
-amp: True
-
-# Determinismo (reproducibilidad)
-# True = resultados reproducibles pero más lento
-# False = más rápido pero ligeras variaciones
-deterministic: False
-
-# Seed para reproducibilidad
+amp: true
+deterministic: false
 seed: 42
-
-# -----------------------------------------------------------------------------
-# NOTAS PARA UPGRADE A RTX 5060 Ti
-# -----------------------------------------------------------------------------
-# Cuando actualices a RTX 5060 Ti, modifica estos parámetros:
-#
-# batch: 32          # o incluso 64 si VRAM lo permite
-# workers: 8         # o más según tu CPU
-# cache: "ram"       # si tienes >=32GB RAM
-# imgsz: 1280        # opcional, para mayor detalle
-#
-# También considera:
-# - Usar modelo más grande (yolov8s.pt o yolov8m.pt)
-# - Aumentar épocas si el dataset es grande
-# - Experimentar con batch=64 para convergencia más estable
 # =============================================================================
