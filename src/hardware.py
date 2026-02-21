@@ -24,7 +24,9 @@ def detect_gpu() -> GPUInfo:
             return GPUInfo(name="CPU", vram_mb=0, cuda_version="", available=False)
 
         name = torch.cuda.get_device_name(0)
-        vram_mb = torch.cuda.get_device_properties(0).total_mem // (1024 * 1024)
+        props = torch.cuda.get_device_properties(0)
+        total_bytes = getattr(props, "total_memory", None) or getattr(props, "total_mem", 0)
+        vram_mb = total_bytes // (1024 * 1024)
         cuda_version = torch.version.cuda or ""
 
         return GPUInfo(name=name, vram_mb=vram_mb, cuda_version=cuda_version, available=True)
