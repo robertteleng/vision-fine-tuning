@@ -52,7 +52,7 @@ cache: "ram"
 # PARAMETROS DE ENTRENAMIENTO
 # -----------------------------------------------------------------------------
 epochs: 100
-patience: 20
+patience: 10       # Regla: patience = 10% de epochs. Con 20 y 50 epochs nunca corto.
 lr0: 0.01
 lrf: 0.01
 momentum: 0.937
