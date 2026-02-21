@@ -141,6 +141,42 @@ Door, Stairs, Street light, Traffic sign, Tree, Wheelchair
 | nav_combined (24 clases) | 11,608 | 11 | ~122s |
 | nav_custom (6 clases) | 3,608 | 11 | ~31s |
 
+## Resultados: nav_combined_24cls (YOLO26s, 50 epochs)
+
+| Metrica | Valor |
+|---------|-------|
+| Mejor epoca | 37/50 |
+| mAP50 | 0.470 |
+| mAP50-95 | 0.311 |
+| Precision | 0.558 |
+| Recall | 0.462 |
+| TensorRT FP16 | 451 FPS (2.21ms) |
+
+### Metricas por clase custom (mAP50)
+
+| Clase | mAP50 | Problema |
+|-------|-------|----------|
+| Wheelchair | 0.696 | — |
+| Tree | 0.497 | — |
+| Traffic sign | 0.417 | — |
+| Door | 0.410 | Variabilidad alta (interiores/exteriores) |
+| Stairs | 0.318 | Pocas variantes, contexto dificil |
+| Street light | 0.044 | Solo 7 imgs en val, datos insuficientes |
+
+## Mejoras pendientes
+
+1. **Mas datos para clases debiles** — Street light necesita minimo 200+ imgs val.
+   Stairs y Door mejorarian con mas variedad (diferentes angulos, iluminacion)
+2. **Entrenar con epochs=100, patience=10** — El primer entrenamiento uso 50 epochs
+   fijos. El modelo convergio en epoch 37 y desperdicio 13 epochs. Con patience=10
+   habria cortado antes y con mas epochs disponibles podria haber llegado mas lejos
+3. **Probar yolo26m.pt** — Modelo medium tiene mas capacidad. Con batch ~5 en
+   RTX 5060 Ti, tardaria ~240s/epoch pero podria mejorar mAP en clases dificiles
+4. **Aumentar datos COCO** — Subir de 8K a 12K imagenes COCO para reforzar
+   las clases que bajaron respecto al modelo base (ej: Truck mAP50=0.418)
+5. **Data augmentation especifica** — Mas rotacion para Stairs, mas variacion
+   de iluminacion para Street light (escenas nocturnas)
+
 ## Herramientas
 
 - **FiftyOne**: Descarga de COCO y Open Images V7 con filtros por clase

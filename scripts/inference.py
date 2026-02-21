@@ -13,6 +13,8 @@ Usage:
 """
 
 import sys
+import shutil
+import subprocess
 import argparse
 import logging
 from pathlib import Path
@@ -113,6 +115,39 @@ def run_inference(args):
 
     logger.info(f"\nProcessed: {processed} | Detections: {total_detections} | "
                 f"Avg: {total_detections / max(processed, 1):.1f}/file")
+
+    # Convert .avi to .mp4 (Ultralytics saves uncompressed MJPG on Linux)
+    if args.save:
+        output_dir = PROJECT_ROOT / "runs" / "inference" / f"predict_{timestamp}"
+        for avi_file in output_dir.glob("*.avi"):
+            mp4_file = avi_file.with_suffix(".mp4")
+            encoder = _detect_ffmpeg_encoder()
+            if encoder:
+                # NVENC uses -qp for quality, libx264 uses -crf
+                quality = ["-qp", "23"] if "nvenc" in encoder else ["-crf", "23"]
+                cmd = ["ffmpeg", "-y", "-i", str(avi_file), "-c:v", encoder, *quality, str(mp4_file)]
+                logger.info(f"Converting to MP4 ({encoder}): {mp4_file.name}")
+                result = subprocess.run(cmd, capture_output=True)
+                if result.returncode == 0:
+                    avi_file.unlink()
+                    logger.info(f"Saved: {mp4_file} ({mp4_file.stat().st_size / (1024*1024):.1f} MB)")
+                else:
+                    logger.warning(f"ffmpeg failed, keeping .avi: {avi_file.name}")
+
+
+def _detect_ffmpeg_encoder() -> str | None:
+    """Return best available ffmpeg h264 encoder, or None if ffmpeg missing."""
+    if not shutil.which("ffmpeg"):
+        return None
+    # Try NVENC first (hardware), fall back to libx264 (software)
+    for encoder in ("h264_nvenc", "libx264"):
+        result = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-encoders"],
+            capture_output=True, text=True,
+        )
+        if encoder in result.stdout:
+            return encoder
+    return "libx264"
 
 
 def export_model(args):
