@@ -13,9 +13,11 @@
 # -----------------------------------------------------------------------------
 # Modelos entrenados y checkpoints
 # -----------------------------------------------------------------------------
-/models/
+/models/*
+!/models/yolo26s_nav.pt
 /runs/
 *.pt
+!models/yolo26s_nav.pt
 *.pth
 *.onnx
 *.engine
