@@ -43,9 +43,15 @@ datasets = [
     "roboflow>=1.1.0",
 ]
 
-# Development and testing
+# Development and testing.
+# SELF-SUFFICIENT by design: `uv sync --extra dev && pytest` must be green on a
+# fresh clone. tests/test_grounding_dino.py imports transformers, so without the
+# annotation extra pytest aborted during COLLECTION — one error killed the whole
+# run and hid the other 45 passing tests, which reads as "the repo is broken"
+# rather than "an extra is missing".
 dev = [
     "pytest>=7.4.0",
+    "fine-tuning-studio[annotation]",
 ]
 
 # All optional dependencies

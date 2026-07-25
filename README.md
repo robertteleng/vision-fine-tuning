@@ -89,8 +89,22 @@ uv run python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, GPU: 
 # Extras opcionales
 uv sync --extra annotation   # Grounding DINO (auto-anotacion zero-shot)
 uv sync --extra datasets      # FiftyOne + Roboflow (descarga de datasets)
+uv sync --extra dev            # pytest (incluye annotation: los tests lo importan)
 uv sync --extra all            # Todo
 ```
+
+### Tests
+
+```bash
+uv sync --extra dev && uv run pytest
+```
+
+`dev` es autosuficiente e incluye `annotation`, porque
+`tests/test_grounding_dino.py` importa transformers: sin el, pytest abortaba en
+la COLECCION y un solo error ocultaba los otros 45 tests que si pasaban.
+
+Los tests de `data/` se saltan solos cuando no hay dataset descargado (`data/`
+esta en .gitignore), pero siguen fallando si el dataset existe y esta incompleto.
 
 ## Uso
 
