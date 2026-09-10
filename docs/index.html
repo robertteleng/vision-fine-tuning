@@ -815,7 +815,7 @@ const PAGE = {
       links: [{href:'https://github.com/robertteleng/vision-fine-tuning', label:'↗ código en GitHub'}],
       prev: '← Anterior', next: 'Siguiente →', end: 'Fin ✓',
       phase: 'Fase', summaryKicker: 'Resumen', progress: (a, b) => a === 0 ? `Resumen · ${b} fases` : `Fase ${a} de ${b}`,
-      qaHeading: 'Preguntas que te haría un entrevistador, con respuesta',
+      qaHeading: 'Preguntas que me hago, con respuesta',
       tags: {entender:'Entender', simular:'Simular', escribir:'Escribir', medir:'Medir', mirar:'Mirar atrás'},
       mapLabel: 'Mapa global del sistema con la parte de esta fase resaltada',
       zoom: 'ampliar', close: 'Cerrar (Esc)',
@@ -828,7 +828,7 @@ const PAGE = {
       links: [{href:'https://github.com/robertteleng/vision-fine-tuning', label:'↗ code on GitHub'}],
       prev: '← Previous', next: 'Next →', end: 'End ✓',
       phase: 'Phase', summaryKicker: 'Summary', progress: (a, b) => a === 0 ? `Summary · ${b} phases` : `Phase ${a} of ${b}`,
-      qaHeading: 'Questions an interviewer would ask, with answers',
+      qaHeading: 'Questions I ask myself, with answers',
       tags: {entender:'Understand', simular:'Simulate', escribir:'Write', medir:'Measure', mirar:'Look back'},
       mapLabel: 'Global map of the system with this phase highlighted',
       zoom: 'enlarge', close: 'Close (Esc)',
@@ -875,7 +875,7 @@ PAGE.steps.es = [
 {
   id: 'resumen', label: 'El proyecto en 2 minutos', date: 'dic 2025 → sep 2026', focus: 'all',
   title: 'Un detector de obstáculos de 24 clases, y el framework para entrenarlo',
-  sub: 'Esta página cuenta cómo se construyó el proyecto, fase a fase, con el código y las métricas reales, incluidas las que salieron mal. Sirve para entenderlo, para reaprenderlo y para explicarlo en una entrevista.',
+  sub: 'Esta página cuenta cómo se construyó el proyecto, fase a fase, con el código y las métricas reales, incluidas las que salieron mal. Sirve para entenderlo, reaprenderlo y saber explicarlo.',
   intro: `
   <div class="pitch">
     <span class="lbl">Pitch</span>
@@ -903,8 +903,8 @@ PAGE.steps.es = [
   `,
   beats: [],
   qa: [
-    {q:'Cuéntame este proyecto en dos minutos.', a:`<p>Sigue el orden de los 5 pasos. <strong>Entender:</strong> un sistema de navegación asistida necesitaba detectar clases que COCO no tiene, como puertas o escaleras. <strong>Simular y escribir:</strong> no se pueden añadir clases a YOLO sin que olvide las originales, así que combiné un subset de COCO con imágenes de Open Images, remapeando los IDs, y construí un framework para anotar, entrenar y exportar. <strong>Medir:</strong> 451 FPS en TensorRT FP16, pero un mAP50 de 0.47, con clases débiles justo donde más importa. <strong>Mirar atrás:</strong> el paso de combinar datasets no está automatizado, nunca evalué con vídeo real de las gafas y la validación de la primera versión estaba contaminada. Eso es lo primero que arreglaría.</p>`},
-    {q:'¿Cuál fue exactamente tu papel?', a:`<p>Todo: definir el problema, los datos, el código, los entrenamientos y los benchmarks. Soy el único autor de los 133 commits. Usé asistentes de IA como apoyo, pero las decisiones y la validación de resultados son mías. Por eso puedo explicar cada número de esta página y también sus límites.</p>`}
+    {q:'¿Cómo explico este proyecto en dos minutos?', a:`<p>Sigue el orden de los 5 pasos. <strong>Entender:</strong> un sistema de navegación asistida necesitaba detectar clases que COCO no tiene, como puertas o escaleras. <strong>Simular y escribir:</strong> no se pueden añadir clases a YOLO sin que olvide las originales, así que combiné un subset de COCO con imágenes de Open Images, remapeando los IDs, y construí un framework para anotar, entrenar y exportar. <strong>Medir:</strong> 451 FPS en TensorRT FP16, pero un mAP50 de 0.47, con clases débiles justo donde más importa. <strong>Mirar atrás:</strong> el paso de combinar datasets no está automatizado, nunca evalué con vídeo real de las gafas y la validación de la primera versión estaba contaminada. Eso es lo primero que arreglaría.</p>`},
+    {q:'¿Qué hice yo exactamente?', a:`<p>Todo: definir el problema, los datos, el código, los entrenamientos y los benchmarks. Soy el único autor de los 133 commits. Usé asistentes de IA como apoyo, pero las decisiones y la validación de resultados son mías. Por eso puedo explicar cada número de esta página y también sus límites.</p>`}
   ]
 },
 
@@ -965,9 +965,9 @@ PAGE.steps.es = [
     </ul>`}
   ],
   qa: [
-    {q:'Tu primer modelo tiene un mAP50 del 98.7%. ¿Te lo crees?', a:`<p>No del todo. Los frames vienen de un único vídeo y el split es aleatorio frame a frame, así que en validación hay frames casi idénticos a los de entrenamiento. Es fuga de datos. El número dice que el modelo reconoce ese vídeo, no que funcione en otro. Para creérmelo haría un split por bloques temporales y probaría con otra grabación.</p>`},
-    {q:'Subiste el umbral de confianza de 0.25 a 0.65. ¿Qué coste tiene?', a:`<p>Menos falsos positivos a cambio de menos recall: los pilares reales con confianza entre 0.25 y 0.65 dejan de detectarse. En un sistema de seguridad para peatones, perder un obstáculo real es peor que un aviso de más. Lo correcto sería elegir el umbral con la curva precision-recall en validación y atacar la causa con ejemplos negativos, no fijarlo a ojo.</p>`},
-    {q:'Añadiste 59 frames de pilares invertidos y el mAP50-95 no cambió. ¿Cómo lo interpretas?', a:`<p>Una métrica agregada puede esconder el subgrupo que te importa. Si la validación tiene pocos pilares invertidos, mejorar en ellos casi no mueve la media. Lo que falta es evaluar ese subconjunto por separado. No lo hice, y es una de las lecciones que me llevo.</p>`}
+    {q:'Mi primer modelo tiene un mAP50 del 98.7%. ¿Me lo creo?', a:`<p>No del todo. Los frames vienen de un único vídeo y el split es aleatorio frame a frame, así que en validación hay frames casi idénticos a los de entrenamiento. Es fuga de datos. El número dice que el modelo reconoce ese vídeo, no que funcione en otro. Para creérmelo haría un split por bloques temporales y probaría con otra grabación.</p>`},
+    {q:'Subí el umbral de confianza de 0.25 a 0.65. ¿Qué me costó?', a:`<p>Menos falsos positivos a cambio de menos recall: los pilares reales con confianza entre 0.25 y 0.65 dejan de detectarse. En un sistema de seguridad para peatones, perder un obstáculo real es peor que un aviso de más. Lo correcto sería elegir el umbral con la curva precision-recall en validación y atacar la causa con ejemplos negativos, no fijarlo a ojo.</p>`},
+    {q:'Añadí 59 frames de pilares invertidos y el mAP50-95 no cambió. ¿Cómo lo interpreto?', a:`<p>Una métrica agregada puede esconder el subgrupo que te importa. Si la validación tiene pocos pilares invertidos, mejorar en ellos casi no mueve la media. Lo que falta es evaluar ese subconjunto por separado. No lo hice, y es una de las lecciones que me llevo.</p>`}
   ]
 },
 
@@ -1023,7 +1023,7 @@ PAGE.steps.es = [
     </ul>`}
   ],
   qa: [
-    {q:'¿Cómo sabes que las anotaciones automáticas son buenas?', a:`<p>Con este proyecto, solo por inspección visual y la revisión con <code>review_annotations.py</code>. No es suficiente. Lo riguroso es un <em>gold set</em> etiquetado a mano y medir precisión y recall del anotador contra él, eligiendo el umbral según esa curva. Es lo primero que añadiría.</p>`},
+    {q:'¿Cómo sé que las anotaciones automáticas son buenas?', a:`<p>Con este proyecto, solo por inspección visual y la revisión con <code>review_annotations.py</code>. No es suficiente. Lo riguroso es un <em>gold set</em> etiquetado a mano y medir precisión y recall del anotador contra él, eligiendo el umbral según esa curva. Es lo primero que añadiría.</p>`},
     {q:'YOLO-World es 12 veces más rápido. ¿Por qué no usarlo?', a:`<p>Porque en este dominio no detectaba casi nada: 8.5% de las imágenes con confianzas por debajo de 0.1. La velocidad no importa si la salida no sirve, y además anotar es un proceso offline. Si fuera inferencia en tiempo real, el trade-off sería otro.</p>`},
     {q:'¿Qué riesgo tiene entrenar un detector con etiquetas generadas por otro modelo?', a:`<p>Que copia sus errores. Si Grounding DINO no ve pilares pequeños o a contraluz, esos casos entran como fondo y el detector aprende a ignorarlos. Se mitiga con revisión humana, un gold set para medir al anotador y añadiendo a mano los casos difíciles.</p>`}
   ]
@@ -1083,8 +1083,8 @@ PAGE.steps.es = [
   ],
   qa: [
     {q:'¿Por qué separar src/ de app.py y de scripts/?', a:`<p>Para tener una única implementación de cada cosa y poder testearla. Antes, entrenar desde la interfaz y desde la CLI eran dos caminos que podían divergir. Ahora los dos llaman a <code>src/</code>. Además, <code>src/</code> se importa sin cargar Gradio, y eso hace los tests rápidos y posibles en CI.</p>`},
-    {q:'Tu detect_gpu() tiene un except Exception. ¿Qué problema tiene?', a:`<p>Convierte cualquier error en un resultado válido ("no hay GPU"). Ya me pasó: un cambio de API de PyTorch hizo que la interfaz dijera que no había GPU, sin ningún error visible. Un <code>except</code> amplio es aceptable en el borde de la interfaz si registra el error. Dentro de la lógica, hay que capturar solo lo esperado y dejar que lo inesperado explote.</p>`},
-    {q:'¿Qué hace batch=-1 y cuándo no lo usarías?', a:`<p>Activa AutoBatch de Ultralytics, que prueba el uso de memoria y elige el batch que cabe en una fracción de la VRAM. No lo usaría cuando necesito reproducir un experimento exacto entre máquinas, porque el batch cambia la dinámica del entrenamiento, ni en una GPU compartida con otros procesos, porque la estimación puede fallar.</p>`}
+    {q:'Mi detect_gpu() tiene un except Exception. ¿Qué problema tiene?', a:`<p>Convierte cualquier error en un resultado válido ("no hay GPU"). Ya me pasó: un cambio de API de PyTorch hizo que la interfaz dijera que no había GPU, sin ningún error visible. Un <code>except</code> amplio es aceptable en el borde de la interfaz si registra el error. Dentro de la lógica, hay que capturar solo lo esperado y dejar que lo inesperado explote.</p>`},
+    {q:'¿Qué hace batch=-1 y cuándo no lo usaría?', a:`<p>Activa AutoBatch de Ultralytics, que prueba el uso de memoria y elige el batch que cabe en una fracción de la VRAM. No lo usaría cuando necesito reproducir un experimento exacto entre máquinas, porque el batch cambia la dinámica del entrenamiento, ni en una GPU compartida con otros procesos, porque la estimación puede fallar.</p>`}
   ]
 },
 
@@ -1156,7 +1156,7 @@ PAGE.steps.es = [
   qa: [
     {q:'¿Por qué no congelar el backbone y entrenar solo una cabeza nueva con las 6 clases?', a:`<p>Porque la cabeza nueva tendría 6 salidas y el modelo dejaría de detectar personas y coches, que también hacen falta. <code>freeze</code> conserva las features aprendidas, no las clases. Para un único modelo con 24 clases hay que entrenar con las 24 a la vez. La alternativa sería dos modelos en paralelo, a costa de duplicar la latencia y la memoria.</p>`},
     {q:'Street light tiene mAP50 de 0.044. ¿El modelo es malo detectando farolas?', a:`<p>No lo sé, y ese es el punto. Con 7 imágenes de validación, acertar o fallar dos cambia el número por completo. Antes de concluir nada necesito cientos de ejemplos de validación. Saber cuándo una métrica no es fiable importa tanto como el número.</p>`},
-    {q:'Mezclas imágenes donde solo están etiquetadas algunas clases. ¿Qué problema tiene?', a:`<p>Etiquetas ausentes: un objeto real sin caja se trata como fondo, y el modelo aprende a suprimirlo. Una foto de Open Images con un camión sin etiquetar penaliza detectar camiones. Creo que explica parte de la caída de Truck, pero no lo he medido. Se mitiga pseudo-etiquetando las clases de COCO en las imágenes propias con el modelo base, revisándolas, o filtrando imágenes con objetos sin etiquetar.</p>`}
+    {q:'Mezclo imágenes donde solo están etiquetadas algunas clases. ¿Qué problema tiene?', a:`<p>Etiquetas ausentes: un objeto real sin caja se trata como fondo, y el modelo aprende a suprimirlo. Una foto de Open Images con un camión sin etiquetar penaliza detectar camiones. Creo que explica parte de la caída de Truck, pero no lo he medido. Se mitiga pseudo-etiquetando las clases de COCO en las imágenes propias con el modelo base, revisándolas, o filtrando imágenes con objetos sin etiquetar.</p>`}
   ]
 },
 
@@ -1212,9 +1212,9 @@ PAGE.steps.es = [
     </ul>`}
   ],
   qa: [
-    {q:'¿Por qué llamas a torch.cuda.synchronize() dentro del bucle?', a:`<p>Porque las operaciones de GPU son asíncronas respecto a la CPU. Sin sincronizar, <code>perf_counter()</code> se para cuando el trabajo está encolado, no terminado, y mides tiempos irrealmente bajos. Sincronizar antes de parar el reloj asegura medir la inferencia completa.</p>`},
+    {q:'¿Por qué llamo a torch.cuda.synchronize() dentro del bucle?', a:`<p>Porque las operaciones de GPU son asíncronas respecto a la CPU. Sin sincronizar, <code>perf_counter()</code> se para cuando el trabajo está encolado, no terminado, y mides tiempos irrealmente bajos. Sincronizar antes de parar el reloj asegura medir la inferencia completa.</p>`},
     {q:'¿Para qué sirve el warmup?', a:`<p>Las primeras inferencias incluyen costes únicos: cargar el engine, reservar memoria y ajustar kernels. Pueden tardar cientos de ms frente a ~3 ms en régimen estable. Si entran en la media la inflan, y como FPS = 1000/media, el error se propaga. Se ejecutan y se descartan.</p>`},
-    {q:'¿TensorRT FP16 pierde precisión? ¿Lo mediste?', a:`<p>Puede perder un poco por redondeo en capas sensibles. En este repo no hay registro de haber comparado el mAP del <code>.engine</code> con el del <code>.pt</code>, así que no puedo afirmar nada. Es lo primero que haría antes de desplegar: <code>yolo val</code> con ambos sobre el mismo conjunto.</p>`}
+    {q:'¿TensorRT FP16 pierde precisión? ¿Lo he medido?', a:`<p>Puede perder un poco por redondeo en capas sensibles. En este repo no hay registro de haber comparado el mAP del <code>.engine</code> con el del <code>.pt</code>, así que no puedo afirmar nada. Es lo primero que haría antes de desplegar: <code>yolo val</code> con ambos sobre el mismo conjunto.</p>`}
   ]
 },
 
@@ -1281,9 +1281,9 @@ PAGE.steps.es = [
     </ul>`}
   ],
   qa: [
-    {q:'¿Por qué versionas el .pt en git y no el .engine?', a:`<p>El <code>.pt</code> es el resultado de horas de entrenamiento y no se regenera sin repetirlo. El <code>.engine</code> es una compilación específica de una GPU y una versión de TensorRT: un engine de mi RTX no sirve en un Jetson. Se versiona la fuente portable y cada destino compila la suya. A más escala usaría Hugging Face Hub o Releases con versión y model card.</p>`},
+    {q:'¿Por qué versiono el .pt en git y no el .engine?', a:`<p>El <code>.pt</code> es el resultado de horas de entrenamiento y no se regenera sin repetirlo. El <code>.engine</code> es una compilación específica de una GPU y una versión de TensorRT: un engine de mi RTX no sirve en un Jetson. Se versiona la fuente portable y cada destino compila la suya. A más escala usaría Hugging Face Hub o Releases con versión y model card.</p>`},
     {q:'Un test que se salta cuando falta data/, ¿no es un test que nunca falla?', a:`<p>En CI, sí, y es su debilidad. En local tiene valor: se salta si no hay dataset, pero falla si hay uno incompleto, y lo verifiqué creando uno parcial. La solución completa es un dataset diminuto en <code>tests/fixtures</code> para que la lógica de validación corra siempre.</p>`},
-    {q:'¿Qué añadirías primero para que esto sea "producción"?', a:`<p>En orden: CI con pytest en CPU, un fixture de datos pequeño, un script reproducible para construir el dataset y una evaluación de regresión que compare mAP por clase contra el modelo anterior antes de publicar uno nuevo. Después, la demo y el model card.</p>`}
+    {q:'¿Qué añadiría primero para que esto sea "producción"?', a:`<p>En orden: CI con pytest en CPU, un fixture de datos pequeño, un script reproducible para construir el dataset y una evaluación de regresión que compare mAP por clase contra el modelo anterior antes de publicar uno nuevo. Después, la demo y el model card.</p>`}
   ]
 },
 
@@ -1312,9 +1312,9 @@ PAGE.steps.es = [
   </div>`,
   beats: [],
   qa: [
-    {q:'Si empezaras de cero, ¿qué harías distinto desde el primer día?', a:`<p>Diseñar la evaluación antes que el modelo: un split sin fuga, un conjunto de test del dominio real (vídeo de las gafas) y métricas por clase para las que importan al producto. En este proyecto la evaluación llegó después y por eso algunos números son optimistas.</p>`},
-    {q:'¿Qué harías con una semana más?', a:`<p>Día 1–2: script reproducible de <code>nav_combined</code> y split corregido. Día 3: grabar y etiquetar un test de vídeo real. Día 4: reentrenar con <code>patience</code> y comparar YOLO26s con YOLO26m en ese test. Día 5: CI, fixture de datos y model card. No añadiría ninguna funcionalidad nueva hasta tener los números bien medidos.</p>`},
-    {q:'¿De qué estás más orgulloso, y cuál fue tu mayor error?', a:`<p>Orgulloso de la estrategia del dataset combinado y del flujo de anotación con revisión humana, que resuelven el problema real de conseguir datos. Mi mayor error fue dar por bueno un 98.7% con un split que filtraba frames. Es un error clásico; lo detecté al revisar el proyecto y por eso está explicado en la primera fase, no escondido.</p>`}
+    {q:'Si empezara de cero, ¿qué haría distinto desde el primer día?', a:`<p>Diseñar la evaluación antes que el modelo: un split sin fuga, un conjunto de test del dominio real (vídeo de las gafas) y métricas por clase para las que importan al producto. En este proyecto la evaluación llegó después y por eso algunos números son optimistas.</p>`},
+    {q:'¿Qué haría con una semana más?', a:`<p>Día 1–2: script reproducible de <code>nav_combined</code> y split corregido. Día 3: grabar y etiquetar un test de vídeo real. Día 4: reentrenar con <code>patience</code> y comparar YOLO26s con YOLO26m en ese test. Día 5: CI, fixture de datos y model card. No añadiría ninguna funcionalidad nueva hasta tener los números bien medidos.</p>`},
+    {q:'¿De qué estoy más orgulloso, y cuál fue mi mayor error?', a:`<p>Orgulloso de la estrategia del dataset combinado y del flujo de anotación con revisión humana, que resuelven el problema real de conseguir datos. Mi mayor error fue dar por bueno un 98.7% con un split que filtraba frames. Es un error clásico; lo detecté al revisar el proyecto y por eso está explicado en la primera fase, no escondido.</p>`}
   ]
 }
 ];
@@ -1324,7 +1324,7 @@ PAGE.steps.en = [
 {
   id: 'resumen', label: 'The project in 2 minutes', date: 'Dec 2025 → Sep 2026', focus: 'all',
   title: 'A 24-class obstacle detector, and the framework to train it',
-  sub: 'This page walks through how the project was built, phase by phase, with the real code and metrics, including the ones that went wrong. Use it to understand the project, to relearn it and to explain it in an interview.',
+  sub: 'This page walks through how the project was built, phase by phase, with the real code and metrics, including the ones that went wrong. Use it to understand the project, relearn it and be able to explain it.',
   intro: `
   <div class="pitch">
     <span class="lbl">Pitch</span>
@@ -1352,8 +1352,8 @@ PAGE.steps.en = [
   `,
   beats: [],
   qa: [
-    {q:'Walk me through this project in two minutes.', a:`<p>In the order of the 5 steps. <strong>Understand:</strong> an assisted-navigation system needed classes COCO doesn't have, like doors or stairs. <strong>Simulate and write:</strong> you can't add classes to YOLO without it forgetting the original ones, so I combined a COCO subset with Open Images data, remapping class IDs, and built a framework to annotate, train and export. <strong>Measure:</strong> 451 FPS with TensorRT FP16, but 0.47 mAP50, with weak classes exactly where it matters. <strong>Look back:</strong> the dataset merge isn't scripted, I never evaluated on real footage from the glasses, and the first version's validation was leaky. That's what I'd fix first.</p>`},
-    {q:'What exactly was your role?', a:`<p>Everything: framing the problem, data, code, training runs and benchmarks. I'm the only author of the 133 commits. I used AI assistants for support, but the decisions and the validation of results are mine. That's why I can explain every number on this page, and its limits.</p>`}
+    {q:'How do I explain this project in two minutes?', a:`<p>In the order of the 5 steps. <strong>Understand:</strong> an assisted-navigation system needed classes COCO doesn't have, like doors or stairs. <strong>Simulate and write:</strong> you can't add classes to YOLO without it forgetting the original ones, so I combined a COCO subset with Open Images data, remapping class IDs, and built a framework to annotate, train and export. <strong>Measure:</strong> 451 FPS with TensorRT FP16, but 0.47 mAP50, with weak classes exactly where it matters. <strong>Look back:</strong> the dataset merge isn't scripted, I never evaluated on real footage from the glasses, and the first version's validation was leaky. That's what I'd fix first.</p>`},
+    {q:'What exactly did I do?', a:`<p>Everything: framing the problem, data, code, training runs and benchmarks. I'm the only author of the 133 commits. I used AI assistants for support, but the decisions and the validation of results are mine. That's why I can explain every number on this page, and its limits.</p>`}
   ]
 },
 
@@ -1414,9 +1414,9 @@ PAGE.steps.en = [
     </ul>`}
   ],
   qa: [
-    {q:'Your first model has 98.7% mAP50. Do you believe it?', a:`<p>Not really. The frames come from one video and the split is random frame by frame, so validation contains frames nearly identical to training ones. That's leakage. The number says the model recognizes that video, not that it works on another. To trust it I'd split by time blocks and test on a different recording.</p>`},
-    {q:'You raised the confidence threshold from 0.25 to 0.65. What does that cost?', a:`<p>Fewer false positives for lower recall: real pillars scoring between 0.25 and 0.65 stop being detected. In a pedestrian safety system, missing a real obstacle is worse than an extra warning. The right move is to pick the threshold from the validation precision-recall curve and fix the cause with negative examples, not set it by eye.</p>`},
-    {q:'You added 59 inverted-pillar frames and mAP50-95 didn\'t change. How do you read that?', a:`<p>An aggregate metric can hide the subgroup you care about. If validation has few inverted pillars, improving on them barely moves the average. What was missing is evaluating that subset separately. I didn't, and it's one of the lessons I took away.</p>`}
+    {q:'My first model has 98.7% mAP50. Do I believe it?', a:`<p>Not really. The frames come from one video and the split is random frame by frame, so validation contains frames nearly identical to training ones. That's leakage. The number says the model recognizes that video, not that it works on another. To trust it I'd split by time blocks and test on a different recording.</p>`},
+    {q:'I raised the confidence threshold from 0.25 to 0.65. What did that cost?', a:`<p>Fewer false positives for lower recall: real pillars scoring between 0.25 and 0.65 stop being detected. In a pedestrian safety system, missing a real obstacle is worse than an extra warning. The right move is to pick the threshold from the validation precision-recall curve and fix the cause with negative examples, not set it by eye.</p>`},
+    {q:'I added 59 inverted-pillar frames and mAP50-95 didn\'t change. How do I read that?', a:`<p>An aggregate metric can hide the subgroup you care about. If validation has few inverted pillars, improving on them barely moves the average. What was missing is evaluating that subset separately. I didn't, and it's one of the lessons I took away.</p>`}
   ]
 },
 
@@ -1472,7 +1472,7 @@ PAGE.steps.en = [
     </ul>`}
   ],
   qa: [
-    {q:'How do you know the automatic annotations are good?', a:`<p>In this project, only by visual inspection and review with <code>review_annotations.py</code>. That isn't enough. The rigorous way is a hand-labeled <em>gold set</em>, measuring the annotator's precision and recall against it and choosing the threshold from that curve. It's the first thing I'd add.</p>`},
+    {q:'How do I know the automatic annotations are good?', a:`<p>In this project, only by visual inspection and review with <code>review_annotations.py</code>. That isn't enough. The rigorous way is a hand-labeled <em>gold set</em>, measuring the annotator's precision and recall against it and choosing the threshold from that curve. It's the first thing I'd add.</p>`},
     {q:'YOLO-World is 12× faster. Why not use it?', a:`<p>Because in this domain it detected almost nothing: 8.5% of images, with confidence below 0.1. Speed doesn't matter if the output is useless, and annotation runs offline anyway. For real-time inference the trade-off would be different.</p>`},
     {q:'What\'s the risk of training a detector on labels produced by another model?', a:`<p>It copies that model's mistakes. If Grounding DINO misses small or backlit pillars, those cases become background and the detector learns to ignore them. You mitigate it with human review, a gold set to measure the annotator, and hand-adding the hard cases.</p>`}
   ]
@@ -1532,8 +1532,8 @@ PAGE.steps.en = [
   ],
   qa: [
     {q:'Why separate src/ from app.py and scripts/?', a:`<p>To have a single implementation of each thing and be able to test it. Before, training from the UI and from the CLI were two paths that could diverge. Now both call <code>src/</code>. And <code>src/</code> imports without loading Gradio, which makes tests fast and CI-friendly.</p>`},
-    {q:'Your detect_gpu() has an except Exception. What\'s wrong with that?', a:`<p>It turns any error into a valid-looking result ("no GPU"). It already bit me: a PyTorch API change made the UI report no GPU with no visible error. A broad <code>except</code> is acceptable at the UI edge if it logs. Inside the logic, catch only what you expect and let the unexpected blow up.</p>`},
-    {q:'What does batch=-1 do, and when wouldn\'t you use it?', a:`<p>It enables Ultralytics AutoBatch, which probes memory usage and picks the batch that fits in a fraction of VRAM. I wouldn't use it when I need to reproduce an experiment exactly across machines, since batch size changes training dynamics, or on a GPU shared with other processes, where the estimate can be wrong.</p>`}
+    {q:'My detect_gpu() has an except Exception. What\'s wrong with that?', a:`<p>It turns any error into a valid-looking result ("no GPU"). It already bit me: a PyTorch API change made the UI report no GPU with no visible error. A broad <code>except</code> is acceptable at the UI edge if it logs. Inside the logic, catch only what you expect and let the unexpected blow up.</p>`},
+    {q:'What does batch=-1 do, and when wouldn\'t I use it?', a:`<p>It enables Ultralytics AutoBatch, which probes memory usage and picks the batch that fits in a fraction of VRAM. I wouldn't use it when I need to reproduce an experiment exactly across machines, since batch size changes training dynamics, or on a GPU shared with other processes, where the estimate can be wrong.</p>`}
   ]
 },
 
@@ -1605,7 +1605,7 @@ PAGE.steps.en = [
   qa: [
     {q:'Why not freeze the backbone and train only a new head on the 6 classes?', a:`<p>Because the new head would have 6 outputs and the model would stop detecting people and cars, which are also needed. <code>freeze</code> keeps learned features, not classes. For one model with 24 classes you train on all 24 together. The alternative is two models side by side, at the cost of double latency and memory.</p>`},
     {q:'Street light has 0.044 mAP50. Is the model bad at street lights?', a:`<p>I don't know, and that's the point. With 7 validation images, getting two right or wrong changes the number completely. Before concluding anything I need hundreds of validation examples. Knowing when a metric isn't reliable matters as much as the number.</p>`},
-    {q:'You mix images where only some classes are labeled. What\'s the problem?', a:`<p>Missing labels: a real object without a box is treated as background, and the model learns to suppress it. An Open Images photo with an unlabeled truck penalizes detecting trucks. I think it explains part of the Truck drop, but I haven't measured it. You can mitigate it by pseudo-labeling COCO classes on the custom images with the base model and reviewing them, or by filtering images with unlabeled objects.</p>`}
+    {q:'I mix images where only some classes are labeled. What\'s the problem?', a:`<p>Missing labels: a real object without a box is treated as background, and the model learns to suppress it. An Open Images photo with an unlabeled truck penalizes detecting trucks. I think it explains part of the Truck drop, but I haven't measured it. You can mitigate it by pseudo-labeling COCO classes on the custom images with the base model and reviewing them, or by filtering images with unlabeled objects.</p>`}
   ]
 },
 
@@ -1661,9 +1661,9 @@ PAGE.steps.en = [
     </ul>`}
   ],
   qa: [
-    {q:'Why call torch.cuda.synchronize() inside the loop?', a:`<p>Because GPU operations are asynchronous relative to the CPU. Without syncing, <code>perf_counter()</code> stops when the work is queued, not finished, and you measure unrealistically low times. Syncing before stopping the clock ensures you measure the full inference.</p>`},
+    {q:'Why do I call torch.cuda.synchronize() inside the loop?', a:`<p>Because GPU operations are asynchronous relative to the CPU. Without syncing, <code>perf_counter()</code> stops when the work is queued, not finished, and you measure unrealistically low times. Syncing before stopping the clock ensures you measure the full inference.</p>`},
     {q:'What is the warmup for?', a:`<p>The first inferences include one-off costs: loading the engine, allocating memory and tuning kernels. They can take hundreds of ms versus ~3 ms steady-state. If they land in the mean they inflate it, and since FPS = 1000/mean, the error carries straight through. You run them and discard them.</p>`},
-    {q:'Does TensorRT FP16 lose accuracy? Did you measure it?', a:`<p>It can lose a little from rounding in sensitive layers. There's no record in this repo of comparing the <code>.engine</code>'s mAP to the <code>.pt</code>'s, so I can't claim anything. It's the first thing I'd do before deploying: <code>yolo val</code> with both on the same set.</p>`}
+    {q:'Does TensorRT FP16 lose accuracy? Did I measure it?', a:`<p>It can lose a little from rounding in sensitive layers. There's no record in this repo of comparing the <code>.engine</code>'s mAP to the <code>.pt</code>'s, so I can't claim anything. It's the first thing I'd do before deploying: <code>yolo val</code> with both on the same set.</p>`}
   ]
 },
 
@@ -1730,9 +1730,9 @@ PAGE.steps.en = [
     </ul>`}
   ],
   qa: [
-    {q:'Why version the .pt in git and not the .engine?', a:`<p>The <code>.pt</code> is hours of training and can't be regenerated without redoing it. The <code>.engine</code> is a build for one GPU and one TensorRT version: an engine from my RTX won't run on a Jetson. You version the portable source and each target builds its own. At larger scale I'd use Hugging Face Hub or Releases with versions and a model card.</p>`},
+    {q:'Why do I version the .pt in git and not the .engine?', a:`<p>The <code>.pt</code> is hours of training and can't be regenerated without redoing it. The <code>.engine</code> is a build for one GPU and one TensorRT version: an engine from my RTX won't run on a Jetson. You version the portable source and each target builds its own. At larger scale I'd use Hugging Face Hub or Releases with versions and a model card.</p>`},
     {q:'A test that skips when data/ is missing: isn\'t that a test that never fails?', a:`<p>In CI, yes, and that's its weakness. Locally it's useful: it skips with no dataset but fails on an incomplete one, which I verified by creating a partial one. The full fix is a tiny dataset in <code>tests/fixtures</code> so the validation logic always runs.</p>`},
-    {q:'What would you add first to make this "production"?', a:`<p>In order: CI running pytest on CPU, a small data fixture, a reproducible dataset-build script, and a regression evaluation that compares per-class mAP against the previous model before publishing a new one. Then the demo and the model card.</p>`}
+    {q:'What would I add first to make this "production"?', a:`<p>In order: CI running pytest on CPU, a small data fixture, a reproducible dataset-build script, and a regression evaluation that compares per-class mAP against the previous model before publishing a new one. Then the demo and the model card.</p>`}
   ]
 },
 
@@ -1761,9 +1761,9 @@ PAGE.steps.en = [
   </div>`,
   beats: [],
   qa: [
-    {q:'If you started over, what would you do differently from day one?', a:`<p>Design the evaluation before the model: a leak-free split, a test set from the real domain (footage from the glasses) and per-class metrics for the classes the product depends on. In this project evaluation came later, which is why some numbers are optimistic.</p>`},
-    {q:'What would you do with one more week?', a:`<p>Days 1–2: reproducible <code>nav_combined</code> script and a fixed split. Day 3: record and label a real-video test set. Day 4: retrain with <code>patience</code> and compare YOLO26s vs YOLO26m on that set. Day 5: CI, data fixture and model card. No new features until the numbers are measured properly.</p>`},
-    {q:'What are you proudest of, and what was your biggest mistake?', a:`<p>Proudest of the combined-dataset strategy and the annotation flow with human review, which solve the real problem of getting data. My biggest mistake was trusting a 98.7% from a split that leaked frames. It's a classic mistake; I caught it when reviewing the project, and that's why it's explained in the first phase instead of hidden.</p>`}
+    {q:'If I started over, what would I do differently from day one?', a:`<p>Design the evaluation before the model: a leak-free split, a test set from the real domain (footage from the glasses) and per-class metrics for the classes the product depends on. In this project evaluation came later, which is why some numbers are optimistic.</p>`},
+    {q:'What would I do with one more week?', a:`<p>Days 1–2: reproducible <code>nav_combined</code> script and a fixed split. Day 3: record and label a real-video test set. Day 4: retrain with <code>patience</code> and compare YOLO26s vs YOLO26m on that set. Day 5: CI, data fixture and model card. No new features until the numbers are measured properly.</p>`},
+    {q:'What am I proudest of, and what was my biggest mistake?', a:`<p>Proudest of the combined-dataset strategy and the annotation flow with human review, which solve the real problem of getting data. My biggest mistake was trusting a 98.7% from a split that leaked frames. It's a classic mistake; I caught it when reviewing the project, and that's why it's explained in the first phase instead of hidden.</p>`}
   ]
 }
 ];
