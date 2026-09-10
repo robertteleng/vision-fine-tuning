@@ -710,6 +710,28 @@
     .fig-card svg{ min-width: 560px; }
   }
 
+  /* ===== Wide screens: centered column, bigger figures ===== */
+  .panel{ max-width: 1160px; margin-inline: auto; padding: 56px 56px 40px; }
+  .panel-sub, .beat-body > p, .beat-body > ul, .explain-box p, .caveat p, .qa-a p, .pitch p{ max-width: 80ch; }
+  .stage-nav{ padding-inline: max(24px, calc((100% - 1160px) / 2 + 56px)); }
+  .fig-card{ position: relative; }
+  .fig-card svg{ width: 100%; }
+  .fig-zoom{ position: absolute; top: 8px; right: 8px; font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+  .fig-zoom:hover, .fig-zoom:focus-visible{ color: var(--accent); border-color: var(--accent); outline: none; }
+  .lightbox{ position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 94%, transparent);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; gap: 14px; }
+  .lightbox[hidden]{ display: none !important; }
+  .lightbox .lb-card{ background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px;
+    width: min(96vw, 1700px); max-height: 82vh; overflow: auto; }
+  .lightbox .lb-card svg{ width: 100%; height: auto; min-width: 900px; display: block; color: var(--text-dim); }
+  .lightbox .lb-cap{ max-width: 90ch; color: var(--text-dim); font-size: 14px; line-height: 1.6; text-align: center; }
+  .lightbox .lb-close{ font-family: var(--sans); font-weight: 600; font-size: 13px; padding: 9px 16px; border-radius: 7px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; }
+  @media (max-width: 640px){ .panel{ padding: 32px 18px 28px; } .lightbox{ padding: 12px; } }
+  .lightbox{ background: var(--bg); }
+  .lightbox .lb-card svg{ max-height: 72vh; }
+
 </style>
 </head>
 <body>
@@ -737,6 +759,11 @@
       <button class="nav-btn primary" id="nextBtn"></button>
     </div>
   </main>
+</div>
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true">
+  <div class="lb-card"></div>
+  <p class="lb-cap"></p>
+  <button class="lb-close" type="button"></button>
 </div>
 
 <script>
@@ -791,6 +818,7 @@ const PAGE = {
       qaHeading: 'Preguntas que te haría un entrevistador, con respuesta',
       tags: {entender:'Entender', simular:'Simular', escribir:'Escribir', medir:'Medir', mirar:'Mirar atrás'},
       mapLabel: 'Mapa global del sistema con la parte de esta fase resaltada',
+      zoom: 'ampliar', close: 'Cerrar (Esc)',
       mapCaption: 'Mapa global: en naranja, la parte del sistema que trata esta fase. Pulsa una caja para saltar a su fase.'
     },
     en: {
@@ -803,6 +831,7 @@ const PAGE = {
       qaHeading: 'Questions an interviewer would ask, with answers',
       tags: {entender:'Understand', simular:'Simulate', escribir:'Write', medir:'Measure', mirar:'Look back'},
       mapLabel: 'Global map of the system with this phase highlighted',
+      zoom: 'enlarge', close: 'Close (Esc)',
       mapCaption: 'Global map: orange marks the part of the system this phase covers. Click a box to jump to its phase.'
     }
   },
@@ -1848,6 +1877,14 @@ function render(){
     g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
   });
 
+  panelsEl.querySelectorAll('.fig').forEach(f => {
+    const card = f.querySelector('.fig-card'); if (!card) return;
+    const b = document.createElement('button');
+    b.className = 'fig-zoom'; b.type = 'button'; b.textContent = '⤢ ' + t.zoom; b.setAttribute('aria-label', t.zoom);
+    b.addEventListener('click', () => openLightbox(f));
+    card.appendChild(b);
+  });
+
   panelsEl.querySelectorAll('.qa-q').forEach(btn => btn.addEventListener('click', () => {
     const item = btn.parentElement; const open = item.classList.toggle('open');
     btn.setAttribute('aria-expanded', String(open));
@@ -1860,6 +1897,23 @@ function render(){
   try { localStorage.setItem(KEY + '-step', String(current)); localStorage.setItem(KEY + '-lang', currentLang); } catch(e) {}
 }
 
+function openLightbox(figEl){
+  const lb = document.getElementById('lightbox');
+  const svg = figEl.querySelector('svg').cloneNode(true);
+  const cap = figEl.querySelector('figcaption');
+  lb.querySelector('.lb-card').replaceChildren(svg);
+  lb.querySelector('.lb-cap').innerHTML = cap ? cap.innerHTML : '';
+  lb.querySelector('.lb-close').textContent = PAGE.ui[currentLang].close;
+  lb.hidden = false; lb.querySelector('.lb-close').focus();
+  // clicking a map node inside the lightbox also jumps
+  svg.querySelectorAll('.map-node').forEach(g => g.addEventListener('click', () => {
+    closeLightbox(); const id = g.dataset.node;
+    const idx = activeSteps().findIndex((st, k) => k > 0 && Array.isArray(st.focus) && st.focus.includes(id));
+    if (idx >= 0) go(idx);
+  }));
+}
+function closeLightbox(){ document.getElementById('lightbox').hidden = true; }
+
 function go(i){
   if (i < 0 || i >= activeSteps().length) return;
   current = i; render();
@@ -1869,7 +1923,9 @@ function go(i){
 document.getElementById('langToggle').addEventListener('click', () => { currentLang = currentLang === 'es' ? 'en' : 'es'; render(); });
 document.getElementById('prevBtn').addEventListener('click', () => go(current - 1));
 document.getElementById('nextBtn').addEventListener('click', () => go(current + 1));
+document.getElementById('lightbox').addEventListener('click', e => { if (e.target.id === 'lightbox' || e.target.classList.contains('lb-close')) closeLightbox(); });
 document.addEventListener('keydown', e => {
+  if (!document.getElementById('lightbox').hidden) { if (e.key === 'Escape') closeLightbox(); return; }
   if (e.target.closest && e.target.closest('input,textarea')) return;
   if (e.key === 'ArrowRight') go(current + 1);
   if (e.key === 'ArrowLeft') go(current - 1);
