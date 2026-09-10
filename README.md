@@ -1,184 +1,88 @@
-# Fine-Tuning Studio
+# Vision Fine-Tuning
 
-Framework universal de fine-tuning para vision por computadora con YOLO.
+Framework para hacer fine-tuning de modelos **YOLO26** (Ultralytics): auto-anotar, entrenar, evaluar y exportar a TensorRT, desde una interfaz Gradio o por CLI.
 
-Entrena, anota, evalua y despliega modelos de deteccion, segmentacion, clasificacion, pose y OBB — todo desde una interfaz web o CLI.
+Nació para un caso real: un detector de obstáculos de **24 clases para navegación asistida** de personas ciegas, usado en AriaGuard.
 
-## Pipeline
+## Resultados
+
+Modelo `yolo26s_nav.pt`: YOLO26s entrenado con 14K imágenes (18 clases de COCO + 6 clases propias de Open Images V7).
+
+| Métrica | Valor |
+|---|---|
+| mAP50 / mAP50-95 | 0.470 / 0.311 (mejor época 37 de 50) |
+| Precision / Recall | 0.558 / 0.462 |
+| TensorRT FP16 | **451 FPS** (2.21 ms/frame), RTX 5060 Ti |
+
+**Límites.** El mAP es modesto y las clases están desbalanceadas. `Stairs`, crítica para el producto, se queda en 0.318. `Street light` saca 0.044 con solo 7 imágenes de validación, así que esa métrica no es fiable. Las mejoras pendientes están en [docs/TRAINING_PROCESS.md](docs/TRAINING_PROCESS.md#mejoras-pendientes).
+
+## Cómo funciona
 
 ```mermaid
 flowchart LR
-    subgraph Datos
-        A[Imagenes / Video] --> B[Auto-Anotacion]
-        B --> C[Dataset YOLO]
-    end
-
-    subgraph Entrenamiento
-        C --> D[Fine-tune YOLO26]
-        D --> E[Evaluar Metricas]
-    end
-
-    subgraph Produccion
-        E --> F[Exportar TensorRT/ONNX]
-        F --> G[Inferencia en Tiempo Real]
-    end
+    A[Imágenes / vídeo] --> B[Auto-anotación<br/>Grounding DINO]
+    B --> C[Dataset YOLO<br/>COCO subset + custom]
+    C --> D[Fine-tune YOLO26]
+    D --> E[Evaluación]
+    E --> F[Export TensorRT FP16 / ONNX]
 ```
 
-## Tareas Soportadas
+**Decisión clave.** YOLO reemplaza la cabeza de detección completa al entrenar, así que no se pueden añadir clases a un modelo COCO sin que olvide las originales. La solución es un **dataset combinado**: un subset de COCO con las clases relevantes más las clases nuevas con los IDs remapeados. Está explicado en detalle en [docs/TRAINING_PROCESS.md](docs/TRAINING_PROCESS.md).
 
-| Tarea | Modelo | Ejemplo |
-|-------|--------|---------|
-| Deteccion | `yolo26[n/s/m/l/x].pt` | Detectar objetos en imagenes |
-| Segmentacion | `yolo26[n/s/m/l/x]-seg.pt` | Segmentar objetos a nivel de pixel |
-| Clasificacion | `yolo26[n/s/m/l/x]-cls.pt` | Clasificar imagenes completas |
-| Pose | `yolo26[n/s/m/l/x]-pose.pt` | Estimar poses humanas |
-| OBB | `yolo26[n/s/m/l/x]-obb.pt` | Bounding boxes orientados |
+Tareas soportadas: detección, segmentación, clasificación, pose y OBB (`yolo26[n/s/m/l/x]`).
 
-## Estructura del Proyecto
+## Instalación
 
-```
-fine-tuning/
-├── app.py                       # Interfaz Gradio (Fine-Tuning Studio)
-├── config.yaml                  # Configuracion de entrenamiento
-├── src/                         # Modulos de logica de negocio
-│   ├── hardware.py              # Auto-deteccion de GPU y defaults
-│   ├── project.py               # Registro de modelos y config de proyecto
-│   ├── inference.py             # Carga de modelos e inferencia
-│   ├── training.py              # Rutinas de entrenamiento YOLO
-│   ├── dataset.py               # Gestion y validacion de datasets
-│   ├── benchmark.py             # Benchmarking de rendimiento
-│   └── annotation.py            # Auto-anotacion y revision
-├── scripts/                     # CLI entry points
-│   ├── train.py                 # Entrenamiento completo
-│   ├── inference.py             # Inferencia (imagen/video/webcam)
-│   ├── auto_annotate.py         # Auto-anotacion template matching
-│   ├── auto_annotate_grounding_dino.py  # Auto-anotacion zero-shot
-│   ├── visualize_annotations.py # Visualizar anotaciones
-│   ├── split_dataset.py         # Dividir train/val
-│   ├── benchmark.py             # Comparar formatos
-│   ├── evaluate.py              # Evaluacion del modelo
-│   └── export_tensorrt.py       # Exportar a TensorRT/ONNX
-├── tests/                       # Suite de tests
-├── data/                        # Datasets (gestionados por usuario)
-├── models/                      # Modelos entrenados (.pt, .onnx, .engine)
-├── runs/                        # Logs de entrenamiento
-├── pyproject.toml               # Dependencias (uv)
-└── docs/                        # Documentacion
-    ├── HITOS.md                 # Roadmap y fases del proyecto
-    ├── ZERO_SHOT_GUIDE.md       # Guia de auto-anotacion zero-shot
-    ├── learning/                # Guias paso a paso
-    └── archive/                 # Documentacion historica (VR project)
-```
-
-## Instalacion
+Requiere [uv](https://docs.astral.sh/uv/) y una GPU NVIDIA con CUDA.
 
 ```bash
-# Clonar
-git clone https://github.com/robertteleng/fine-tuning.git
-cd fine-tuning
-
-# Instalar uv (gestor de paquetes rapido)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Instalar dependencias (crea .venv automaticamente)
-uv sync
-
-# Verificar GPU
-uv run python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, GPU: {torch.cuda.get_device_name(0)}')"
-
-# Extras opcionales
-uv sync --extra annotation   # Grounding DINO (auto-anotacion zero-shot)
-uv sync --extra datasets      # FiftyOne + Roboflow (descarga de datasets)
-uv sync --extra dev            # pytest (incluye annotation: los tests lo importan)
-uv sync --extra all            # Todo
+git clone https://github.com/robertteleng/vision-fine-tuning.git
+cd vision-fine-tuning
+uv sync                      # core
+uv sync --extra annotation   # + Grounding DINO
+uv sync --extra datasets     # + FiftyOne / Roboflow
+uv sync --extra dev          # + pytest
 ```
-
-### Tests
-
-```bash
-uv sync --extra dev && uv run pytest
-```
-
-`dev` es autosuficiente e incluye `annotation`, porque
-`tests/test_grounding_dino.py` importa transformers: sin el, pytest abortaba en
-la COLECCION y un solo error ocultaba los otros 45 tests que si pasaban.
-
-Los tests de `data/` se saltan solos cuando no hay dataset descargado (`data/`
-esta en .gitignore), pero siguen fallando si el dataset existe y esta incompleto.
 
 ## Uso
 
-### Interfaz Web (Gradio)
-
 ```bash
-python app.py
-# Abre http://localhost:7860
+# Interfaz web: Inference, Metrics, Training, Auto-Annotate, Dataset, Annotations, Info
+uv run python app.py                                   # http://localhost:7860
+
+# CLI
+uv run python scripts/train.py -m yolo26s.pt -e 50
+uv run python scripts/inference.py --source video.mp4
+uv run python scripts/auto_annotate_grounding_dino.py --source data/frames/ --prompt "door" --output data/dataset/
+uv run python scripts/export_tensorrt.py --format engine --half
+uv run python scripts/benchmark.py
+
+# Tests (los que dependen de data/ se saltan si no hay dataset)
+uv run pytest
 ```
 
-7 tabs: Inference, Metrics, Training, Auto-Annotate, Dataset, Annotations, Info.
+Los hiperparámetros están en [`config.yaml`](config.yaml). La GPU se detecta automáticamente y `batch: -1` ajusta el batch a la VRAM disponible.
 
-### CLI
+## Estructura
 
-```bash
-# Entrenamiento
-uv run python scripts/train.py
-
-# Inferencia
-python scripts/inference.py --source imagen.jpg
-python scripts/inference.py --source video.mp4
-python scripts/inference.py --source 0 --show  # webcam
-
-# Auto-anotacion zero-shot
-python scripts/auto_annotate_grounding_dino.py \
-  --source data/frames/ \
-  --prompt "your object description" \
-  --output data/dataset/
-
-# Exportar a TensorRT
-python scripts/export_tensorrt.py --format engine --half
-
-# Benchmark
-python scripts/benchmark.py
+```
+app.py            Interfaz Gradio
+config.yaml       Hiperparámetros de entrenamiento
+src/              Lógica: hardware, project, training, inference, dataset, annotation, benchmark
+scripts/          CLI: train, inference, evaluate, benchmark, export_tensorrt,
+                  auto_annotate(_grounding_dino), review/visualize_annotations, split_dataset
+tests/            pytest
+models/           yolo26s_nav.pt (modelo entrenado)
+docs/             Guías (ver abajo)
 ```
 
-## Configuracion
+## Documentación
 
-Edita `config.yaml` para ajustar hiperparametros:
+- [Proceso de entrenamiento y dataset combinado](docs/TRAINING_PROCESS.md)
+- [Guía de auto-anotación zero-shot](docs/ZERO_SHOT_GUIDE.md)
+- [Guías paso a paso](docs/learning/README.md): pipeline, elección de modelo, TensorRT, benchmark
+- [docs/archive/](docs/archive/): origen del proyecto como detector de objetos VR (YOLOv12s)
 
-```yaml
-model: "yolo26m.pt"    # Modelo base
-batch: -1              # Auto-detect segun VRAM
-workers: 8             # Workers del DataLoader
-imgsz: 640             # Tamano de entrada
-epochs: 100            # Epocas de entrenamiento
-patience: 20           # Early stopping
-amp: true              # Mixed precision
-cache: "ram"           # Cacheo en RAM
-```
+## Stack
 
-La GPU se auto-detecta y los defaults se ajustan automaticamente.
-
-## Stack Tecnico
-
-- **Modelo:** YOLO26 (Ultralytics >=8.4.14) — NMS-free, end-to-end
-- **Framework:** PyTorch + Ultralytics
-- **UI:** Gradio
-- **Anotacion:** Template Matching + Grounding DINO (zero-shot)
-- **Export:** TensorRT FP16, ONNX
-- **Entorno:** uv (gestor de paquetes)
-- **Testing:** pytest
-
-## Historial del Proyecto
-
-Este proyecto evoluciono desde un detector especifico de objetos VR (YOLOv12s) a un framework universal de fine-tuning. La documentacion historica se encuentra en [docs/archive/](docs/archive/).
-
-## Referencias
-
-- [Ultralytics YOLO](https://docs.ultralytics.com/)
-- [YOLO26](https://docs.ultralytics.com/models/yolo26/)
-- [Grounding DINO](https://github.com/IDEA-Research/GroundingDINO)
-- [makesense.ai](https://www.makesense.ai/) — Anotacion web gratuita
-
----
-
-*Ultima actualizacion: Febrero 2026*
+YOLO26 (Ultralytics ≥ 8.4.14) · PyTorch · Grounding DINO (transformers) · TensorRT · Gradio · FiftyOne · uv · pytest

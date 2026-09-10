@@ -126,3 +126,21 @@ tb_logs/
 *.mov
 results/
 outputs/
+
+# -----------------------------------------------------------------------------
+# Tooling de desarrollo con IA (solo local, no forma parte del proyecto)
+# -----------------------------------------------------------------------------
+.claude/
+CLAUDE.md
+AGENTS.md
+PAIR_WORKFLOW.md
+DEVELOPER_DIARY.md
+NEXT_SESSION.md
+docs/teamwork/
+docs/development/
+docs/workflows/
+docs/research/
+docs/project/
+docs/DOCUMENTATION_GUIDE.md
+scripts/architecture/
+.pytest_cache/
