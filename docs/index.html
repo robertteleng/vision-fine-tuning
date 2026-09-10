@@ -732,6 +732,22 @@
   .lightbox{ background: var(--bg); }
   .lightbox .lb-card svg{ max-height: 72vh; }
 
+  /* ===== Glossary ===== */
+  .c-count{ font-family: var(--mono); font-size: 12px; color: var(--accent); margin: -16px 0 18px; }
+  .c-group{ margin: 0 0 26px; }
+  .c-group h3{ font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
+  .concept{ display: grid; grid-template-columns: 130px minmax(0,1fr) auto; gap: 14px; align-items: start; padding: 12px 14px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--surface); margin-bottom: 8px; }
+  .concept.known{ border-color: var(--ok); }
+  .concept.pending{ opacity: .7; border-style: dashed; }
+  .c-body h4{ margin: 0 0 3px; font-size: 14px; font-weight: 700; color: var(--text); }
+  .c-body p{ margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-dim); }
+  .c-check{ display: flex; gap: 7px; align-items: center; font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); cursor: pointer; padding-top: 2px; }
+  .c-check input{ accent-color: var(--ok); width: 15px; height: 15px; }
+  .concept.known .c-check{ color: var(--ok); }
+  .c-go{ font-family: var(--mono); font-size: 11px; color: var(--text-dim); background: none; border: 1px solid var(--line-soft); border-radius: 6px; padding: 4px 9px; cursor: pointer; white-space: nowrap; }
+  .c-go:hover, .c-go:focus-visible{ color: var(--accent); border-color: var(--accent); outline: none; }
+  @media (max-width: 640px){ .concept{ grid-template-columns: minmax(0,1fr); gap: 8px; } .c-go{ justify-self: start; } }
+
 </style>
 </head>
 <body>
@@ -804,6 +820,155 @@ function pipelineSvg(labels){
       ${i < labels.length - 1 ? `<line class="s-line" x1="${x + 168}" y1="55" x2="${x + 192}" y2="55" marker-end="url(#arrow)"/>` : ''}`;
   }).join('');
 }
+
+/* ===== Glossary: what this repo taught me =====
+   Each concept: group, phase id where it shows up, ES/EN term + one-line definition. */
+const CONCEPT_GROUPS = {
+  datos:    {es:'Datos y anotación', en:'Data and annotation'},
+  train:    {es:'Entrenamiento y evaluación', en:'Training and evaluation'},
+  medida:   {es:'Inferencia y medida', en:'Inference and measurement'},
+  soft:     {es:'Ingeniería de software', en:'Software engineering'},
+  metodo:   {es:'Método', en:'Method'}
+};
+const CONCEPTS = [
+  // Datos y anotación
+  {id:'template-matching', g:'datos', phase:'origen',
+   es:['Template matching','Deslizar una imagen patrón sobre otra y puntuar el parecido en cada posición. Barato, pero frágil ante cambios de aspecto (pilares invertidos).'],
+   en:['Template matching','Slide a pattern image over another and score similarity at each position. Cheap, but brittle when the look changes (inverted pillars).']},
+  {id:'nms', g:'datos', phase:'origen',
+   es:['NMS (non-maximum suppression)','Entre cajas que se solapan por encima de un IoU, quedarse con la de mayor puntuación. YOLO26 se anuncia como end-to-end, sin NMS en inferencia.'],
+   en:['NMS (non-maximum suppression)','Among boxes overlapping above an IoU threshold, keep the highest-scoring one. YOLO26 is presented as end-to-end, with no NMS at inference.']},
+  {id:'umbral', g:'datos', phase:'origen',
+   es:['Umbral de confianza','Subirlo quita falsos positivos y también detecciones reales. Se elige con la curva precision-recall, no a ojo.'],
+   en:['Confidence threshold','Raising it removes false positives and real detections too. Pick it from the precision-recall curve, not by eye.']},
+  {id:'fuga', g:'datos', phase:'origen',
+   es:['Fuga de datos train/val','Imágenes casi idénticas en entrenamiento y validación inflan la métrica. Con vídeo: dividir por bloques o escenas, nunca frame a frame.'],
+   en:['Train/val leakage','Near-identical images in training and validation inflate the metric. With video: split by blocks or scenes, never frame by frame.']},
+  {id:'zero-shot', g:'datos', phase:'zeroshot',
+   es:['Detección zero-shot','Detectar clases no vistas en entrenamiento a partir de texto (Grounding DINO, YOLO-World). Útil para proponer etiquetas, no para fiarse sin revisar.'],
+   en:['Zero-shot detection','Detect classes unseen in training from a text prompt (Grounding DINO, YOLO-World). Useful to propose labels, not to trust unreviewed.']},
+  {id:'yolo-format', g:'datos', phase:'zeroshot',
+   es:['Formato de etiqueta YOLO','Una línea por caja: clase cx cy w h, normalizados entre 0 y 1. Un error de normalización no da error: enseña basura.'],
+   en:['YOLO label format','One line per box: class cx cy w h, normalized to 0–1. A normalization bug throws no error: it teaches garbage.']},
+  {id:'gold-set', g:'datos', phase:'zeroshot',
+   es:['Gold set','Pequeño conjunto etiquetado a mano para medir la calidad de un anotador automático (precisión y recall).'],
+   en:['Gold set','A small hand-labeled set used to measure an automatic annotator\'s quality (precision and recall).']},
+  {id:'pseudo', g:'datos', phase:'zeroshot',
+   es:['Pseudo-etiquetas','Etiquetas generadas por otro modelo. El detector hereda sus errores sistemáticos.'],
+   en:['Pseudo-labels','Labels produced by another model. The detector inherits its systematic errors.']},
+  {id:'missing-labels', g:'datos', phase:'dataset',
+   es:['Etiquetas ausentes','Un objeto real sin caja cuenta como fondo, y el modelo aprende a suprimirlo.'],
+   en:['Missing labels','A real object without a box counts as background, and the model learns to suppress it.']},
+  // Entrenamiento
+  {id:'head', g:'train', phase:'dataset',
+   es:['Cabeza de detección','Última parte del modelo, con una salida por clase. Cambiar el número de clases la sustituye entera.'],
+   en:['Detection head','The model\'s last part, with one output per class. Changing the class count replaces it entirely.']},
+  {id:'freeze', g:'train', phase:'dataset',
+   es:['Congelar el backbone (freeze)','No actualizar las primeras capas al entrenar. Conserva features, no clases.'],
+   en:['Freezing the backbone','Not updating the early layers during training. Keeps features, not classes.']},
+  {id:'forgetting', g:'train', phase:'dataset',
+   es:['Olvido catastrófico','Al entrenar solo con clases nuevas, el modelo pierde las que sabía.'],
+   en:['Catastrophic forgetting','Training only on new classes makes the model lose the ones it knew.']},
+  {id:'remap', g:'train', phase:'dataset',
+   es:['Dataset combinado y remapeo de IDs','Unir fuentes en un solo espacio de clases desplazando IDs (custom 0–5 → 18–23) para no chocar.'],
+   en:['Combined dataset and ID remap','Merge sources into one class space by shifting IDs (custom 0–5 → 18–23) so they don\'t collide.']},
+  {id:'map', g:'train', phase:'dataset',
+   es:['mAP50 vs mAP50-95','mAP50: precisión media con IoU ≥ 0.5. mAP50-95: promedio con IoU de 0.50 a 0.95; exige cajas más ajustadas.'],
+   en:['mAP50 vs mAP50-95','mAP50: mean average precision at IoU ≥ 0.5. mAP50-95: averaged over IoU 0.50 to 0.95; demands tighter boxes.']},
+  {id:'small-sample', g:'train', phase:'dataset',
+   es:['Métrica con pocas muestras','Con 7 imágenes de validación el número es ruido. Antes de concluir, contar cuántos ejemplos hay detrás.'],
+   en:['Metric on few samples','With 7 validation images the number is noise. Before concluding, count the examples behind it.']},
+  {id:'aggregate', g:'train', phase:'origen',
+   es:['Media que esconde subgrupos','Una métrica global puede no moverse aunque mejore (o empeore) el caso crítico. Medirlo por separado.'],
+   en:['Averages hide subgroups','A global metric may not move while the critical case improves (or worsens). Measure it separately.']},
+  {id:'patience', g:'train', phase:'dataset',
+   es:['Early stopping (patience)','Parar si la validación no mejora en N épocas. Evita épocas desperdiciadas (37 de 50).'],
+   en:['Early stopping (patience)','Stop when validation hasn\'t improved for N epochs. Avoids wasted epochs (best was 37 of 50).']},
+  {id:'autobatch', g:'train', phase:'framework',
+   es:['AutoBatch (batch=-1)','Ultralytics elige el batch que cabe en una fracción de la VRAM. Cómodo, pero cambia entre máquinas.'],
+   en:['AutoBatch (batch=-1)','Ultralytics picks the batch that fits a fraction of VRAM. Convenient, but it varies across machines.']},
+  // Medida
+  {id:'tensorrt', g:'medida', phase:'velocidad',
+   es:['TensorRT y engine','Compilador de NVIDIA: fusiona capas, elige kernels y usa FP16. Produce un .engine para una GPU y versión concretas.'],
+   en:['TensorRT and engine','NVIDIA\'s compiler: fuses layers, picks kernels, uses FP16. Produces an .engine for one GPU and version.']},
+  {id:'fp16', g:'medida', phase:'velocidad',
+   es:['FP16','Números de 16 bits en vez de 32. Más rápido y menos memoria; la pérdida de precisión hay que medirla, no suponerla.'],
+   en:['FP16','16-bit numbers instead of 32. Faster and lighter; the accuracy loss must be measured, not assumed.']},
+  {id:'portable', g:'medida', phase:'metodologia',
+   es:['Engine no portable','Se versiona el .pt y cada dispositivo compila su propio .engine.'],
+   en:['Non-portable engine','Version the .pt; each device builds its own .engine.']},
+  {id:'async', g:'medida', phase:'velocidad',
+   es:['GPU asíncrona y synchronize()','Python vuelve cuando el trabajo está encolado. Sin sincronizar, el cronómetro mide la cola, no la inferencia.'],
+   en:['Async GPU and synchronize()','Python returns once work is queued. Without syncing, the timer measures the queue, not inference.']},
+  {id:'warmup', g:'medida', phase:'velocidad',
+   es:['Warmup','Descartar las primeras inferencias: incluyen carga del engine, memoria y ajuste de kernels.'],
+   en:['Warmup','Discard the first inferences: they include engine loading, memory allocation and kernel tuning.']},
+  {id:'p95', g:'medida', phase:'velocidad',
+   es:['Media vs p95/p99','La media describe el frame típico; el p95 describe el lento, que es el que importa en seguridad.'],
+   en:['Mean vs p95/p99','The mean describes the typical frame; p95 describes the slow one, which is what matters for safety.']},
+  {id:'synthetic', g:'medida', phase:'velocidad',
+   es:['Benchmark sintético vs real','Una imagen de ruido no tiene decodificación ni objetos: subestima el tiempo real por frame.'],
+   en:['Synthetic vs real benchmark','A noise image has no decoding and no objects: it underestimates real per-frame time.']},
+  {id:'repro', g:'medida', phase:'mirar-atras',
+   es:['Número reproducible','Cada métrica va con su comando, su commit y su hardware. Si no, no se puede defender.'],
+   en:['Reproducible number','Every metric ships with its command, commit and hardware. Otherwise it can\'t be defended.']},
+  {id:'int8', g:'medida', phase:'velocidad', pending:true,
+   es:['INT8, PTQ y calibración','Pendiente: se aprende en el lab 07 (FP32 → FP16 → INT8 en la 5060 Ti y en el Jetson).'],
+   en:['INT8, PTQ and calibration','Pending: learned in lab 07 (FP32 → FP16 → INT8 on the 5060 Ti and the Jetson).']},
+  // Software
+  {id:'layers', g:'soft', phase:'framework',
+   es:['Separar interfaz y lógica','UI y CLI llaman a la misma lógica en src/. Una sola implementación, testeable sin arrancar la interfaz.'],
+   en:['Separate UI from logic','UI and CLI call the same logic in src/. One implementation, testable without launching the UI.']},
+  {id:'broad-except', g:'soft', phase:'framework',
+   es:['except amplio','Convierte cualquier error en un resultado que parece válido. Capturar solo lo esperado, o al menos registrar.'],
+   en:['Broad except','Turns any error into a valid-looking result. Catch only what you expect, or at least log it.']},
+  {id:'extras', g:'soft', phase:'framework',
+   es:['Extras de dependencias (uv)','Dependencias pesadas opcionales (uv sync --extra annotation). El extra de tests debe incluir lo que los tests importan.'],
+   en:['Dependency extras (uv)','Optional heavy dependencies (uv sync --extra annotation). The test extra must include what tests import.']},
+  {id:'collection', g:'soft', phase:'metodologia',
+   es:['Error de recolección en pytest','Un import fallido al recolectar aborta toda la ejecución y oculta los tests que pasan.'],
+   en:['pytest collection error','A failing import during collection aborts the whole run and hides the passing tests.']},
+  {id:'skip-fail', g:'soft', phase:'metodologia',
+   es:['skip vs fail','Saltar si falta el dato local; fallar si existe pero está incompleto. En CI hace falta un fixture para que corra.'],
+   en:['skip vs fail','Skip when local data is missing; fail when it exists but is incomplete. CI needs a fixture for it to run.']},
+  {id:'artifacts', g:'soft', phase:'metodologia',
+   es:['Versionar artefactos no regenerables','Guardar lo que costaría reentrenar (.pt); no lo que se regenera en cada máquina (.engine).'],
+   en:['Versioning non-regenerable artifacts','Keep what would cost a retrain (.pt); not what each machine regenerates (.engine).']},
+  {id:'silent', g:'soft', phase:'mirar-atras',
+   es:['Errores silenciosos','Los caros no fallan: dan un resultado equivocado que parece correcto (remapeo, split, except).'],
+   en:['Silent errors','The expensive ones don\'t crash: they return a wrong result that looks right (remap, split, except).']},
+  // Método
+  {id:'polya', g:'metodo', phase:'resumen',
+   es:['Los 5 pasos','Entender, simular con números, escribir, medir y mirar atrás. Adaptado de Pólya (1945).'],
+   en:['The 5 steps','Understand, simulate with numbers, write, measure, look back. Adapted from Pólya (1945).']},
+  {id:'criterio', g:'metodo', phase:'mirar-atras',
+   es:['Criterio antes de medir','Decidir qué resultado acepto antes de ver los números, para no ajustarlo a lo que salga.'],
+   en:['Criterion before measuring','Decide what result I\'ll accept before seeing the numbers, so I don\'t fit it to what comes out.']},
+  {id:'eval-first', g:'metodo', phase:'mirar-atras',
+   es:['Evaluación antes que modelo','Primero un split sin fuga y un test del dominio real; después entrenar.'],
+   en:['Evaluation before model','First a leak-free split and a real-domain test set; then train.']}
+];
+
+function conceptsHtml(lang){
+  const L = lang === 'es'
+    ? {intro:'Todo lo que me enseñó este repo, en una línea por concepto. Marca los que sabrías explicar sin mirar: la marca se guarda en este navegador.', known:'sé explicarlo', see:'ver fase', pending:'pendiente', count:(a,b)=>`${a} de ${b} que sé explicar`}
+    : {intro:'Everything this repo taught me, one line per concept. Tick the ones you could explain without looking: ticks are saved in this browser.', known:'I can explain it', see:'see phase', pending:'pending', count:(a,b)=>`${a} of ${b} I can explain`};
+  const groups = Object.keys(CONCEPT_GROUPS).map(g => {
+    const items = CONCEPTS.filter(c => c.g === g).map(c => {
+      const [t, d] = c[lang];
+      return `<div class="concept${c.pending ? ' pending' : ''}">
+        <label class="c-check"><input type="checkbox" data-concept="${c.id}" ${c.pending ? 'disabled' : ''}><span>${c.pending ? L.pending : L.known}</span></label>
+        <div class="c-body"><h4>${t}</h4><p>${d}</p></div>
+        <button class="c-go" type="button" data-go="${c.phase}">${L.see} →</button>
+      </div>`;
+    }).join('');
+    return `<section class="c-group"><h3>${CONCEPT_GROUPS[g][lang]}</h3>${items}</section>`;
+  }).join('');
+  return `<p class="panel-sub">${L.intro}</p>
+    <p class="c-count" data-count-tpl="${lang}"></p>
+    ${groups}`;
+}
+function conceptCountLabel(lang, a, b){ return lang === 'es' ? `${a} de ${b} que sé explicar` : `${a} of ${b} I can explain`; }
 
 const PAGE = {
   slug: 'vision-fine-tuning',
@@ -1317,6 +1482,15 @@ PAGE.steps.es = [
     {q:'¿De qué estoy más orgulloso, y cuál fue mi mayor error?', a:`<p>Orgulloso de la estrategia del dataset combinado y del flujo de anotación con revisión humana, que resuelven el problema real de conseguir datos. Mi mayor error fue dar por bueno un 98.7% con un split que filtraba frames. Es un error clásico; lo detecté al revisar el proyecto y por eso está explicado en la primera fase, no escondido.</p>`}
   ]
 }
+/* ───────────────────────── 8 · GLOSARIO ───────────────────────── */
+,{
+  id: 'glosario', label: 'Conceptos: lo que me enseñó', date: '8 fases', focus: 'all', kicker: 'Glosario',
+  title: 'Glosario del proyecto',
+  sub: 'Los conceptos de todas las fases en un solo sitio, para repasar y comprobar qué sé explicar.',
+  intro: conceptsHtml('es'),
+  beats: [],
+  qa: []
+}
 ];
 
 PAGE.steps.en = [
@@ -1766,6 +1940,15 @@ PAGE.steps.en = [
     {q:'What am I proudest of, and what was my biggest mistake?', a:`<p>Proudest of the combined-dataset strategy and the annotation flow with human review, which solve the real problem of getting data. My biggest mistake was trusting a 98.7% from a split that leaked frames. It's a classic mistake; I caught it when reviewing the project, and that's why it's explained in the first phase instead of hidden.</p>`}
   ]
 }
+/* ───────────────────────── 8 · GLOSARIO ───────────────────────── */
+,{
+  id: 'glosario', label: 'Concepts: what it taught me', date: '8 phases', focus: 'all', kicker: 'Glossary',
+  title: 'Project glossary',
+  sub: 'Concepts from every phase in one place, to review and check what I can explain.',
+  intro: conceptsHtml('en'),
+  beats: [],
+  qa: []
+}
 ];
 
 /* ===== Explainer engine (shared across repos) =====
@@ -1849,7 +2032,7 @@ function render(){
     const panel = document.createElement('section');
     panel.className = 'panel' + (i === current ? ' active' : '');
     panel.id = 'panel-' + s.id;
-    const kicker = i === 0 ? t.summaryKicker : `${t.phase} ${i}`;
+    const kicker = s.kicker || (i === 0 ? t.summaryKicker : `${t.phase} ${i}`);
     panel.innerHTML = `
       <p class="kicker">${kicker} <span class="date">· ${s.date}</span></p>
       <h1 class="panel-title">${s.title}</h1>
@@ -1876,6 +2059,29 @@ function render(){
     g.addEventListener('click', jump);
     g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
   });
+
+  panelsEl.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => {
+    const idx = activeSteps().findIndex(st => st.id === b.dataset.go); if (idx >= 0) go(idx);
+  }));
+  let known = {};
+  try { known = JSON.parse(localStorage.getItem(KEY + '-concepts') || '{}'); } catch(e) {}
+  const boxes = panelsEl.querySelectorAll('input[data-concept]');
+  const updateCount = () => {
+    const enabled = [...boxes].filter(x => !x.disabled);
+    const n = enabled.filter(x => x.checked).length;
+    panelsEl.querySelectorAll('.c-count').forEach(el => el.textContent = conceptCountLabel(currentLang, n, enabled.length));
+  };
+  boxes.forEach(x => {
+    x.checked = !!known[x.dataset.concept];
+    x.closest('.concept').classList.toggle('known', x.checked);
+    x.addEventListener('change', () => {
+      known[x.dataset.concept] = x.checked;
+      x.closest('.concept').classList.toggle('known', x.checked);
+      try { localStorage.setItem(KEY + '-concepts', JSON.stringify(known)); } catch(e) {}
+      updateCount();
+    });
+  });
+  if (boxes.length) updateCount();
 
   panelsEl.querySelectorAll('.fig').forEach(f => {
     const card = f.querySelector('.fig-card'); if (!card) return;
