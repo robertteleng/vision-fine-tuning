@@ -1,0 +1,1896 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cómo se construyó Vision Fine-Tuning</title>
+<meta name="description" content="Bitácora técnica de vision-fine-tuning: fine-tuning de YOLO26 para navegación asistida, con código, métricas y límites. ES/EN.">
+<meta property="og:title" content="How Vision Fine-Tuning was built">
+<meta property="og:description" content="YOLO26 fine-tuning for assisted navigation: code, metrics and honest limits. ES/EN.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg: #f3f5f7;
+    --surface: #ffffff;
+    --surface-2: #e9edf1;
+    --line: #c3ccd4;
+    --line-soft: #d9dfe4;
+    --text: #1b232c;
+    --text-dim: #5b6773;
+    --text-faint: #8894a0;
+    --accent: #d9722c;
+    --accent-2: #b3591f;
+    --ok: #2f6f4f;
+    --ok-soft: #dbeee1;
+    --danger: #b3402c;
+    --danger-soft: #f3ddd5;
+    --warn: #3a5f8a;
+    --code-bg: #171b1f;
+    --code-text: #e6e6e0;
+    --display: 'Fraunces', Georgia, serif;
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg: #14181d;
+      --surface: #1b2128;
+      --surface-2: #222a32;
+      --line: #3a444e;
+      --line-soft: #2b333b;
+      --text: #e8edf2;
+      --text-dim: #9aa7b3;
+      --text-faint: #6b7885;
+      --accent: #e8975a;
+      --accent-2: #f0ac78;
+      --ok: #6bbf94;
+      --ok-soft: #1e2f26;
+      --danger: #d97a63;
+      --danger-soft: #35201a;
+      --warn: #7fa8d6;
+      --code-bg: #0d1013;
+      --code-text: #e6e6e0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: #14181d;
+    --surface: #1b2128;
+    --surface-2: #222a32;
+    --line: #3a444e;
+    --line-soft: #2b333b;
+    --text: #e8edf2;
+    --text-dim: #9aa7b3;
+    --text-faint: #6b7885;
+    --accent: #e8975a;
+    --accent-2: #f0ac78;
+    --ok: #6bbf94;
+    --ok-soft: #1e2f26;
+    --danger: #d97a63;
+    --danger-soft: #35201a;
+    --warn: #7fa8d6;
+    --code-bg: #0d1013;
+    --code-text: #e6e6e0;
+  }
+
+  *{ box-sizing: border-box; }
+  html{ scroll-behavior: smooth; }
+  body{
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ===== Shell layout ===== */
+  .shell{
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+  }
+  @media (max-width: 860px){
+    .shell{ grid-template-columns: 1fr; }
+    .rail{ position: static; height: auto; border-right: none; border-bottom: 1px solid var(--line-soft); }
+  }
+
+  /* ===== Rail (timeline nav) ===== */
+  .rail{
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid var(--line-soft);
+    padding: 28px 20px 28px 26px;
+    display: flex;
+    flex-direction: column;
+  }
+  .rail-head{ margin-bottom: 28px; }
+  .rail-eyebrow{
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+  }
+  .rail-title{
+    font-family: var(--display);
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.25;
+  }
+
+  .steps{ list-style: none; margin: 0; padding: 0; position: relative; flex: 1; }
+  .steps::before{
+    content: "";
+    position: absolute;
+    left: 9px; top: 6px; bottom: 6px;
+    width: 1px;
+    background: var(--line);
+  }
+  .step-item{ position: relative; padding: 0 0 22px 30px; }
+  .step-item:last-child{ padding-bottom: 0; }
+  .step-dot{
+    position: absolute; left: 3px; top: 2px;
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--line);
+    transition: border-color .2s ease, background .2s ease;
+  }
+  .step-btn{
+    all: unset;
+    cursor: pointer;
+    display: block;
+    width: 100%;
+  }
+  .step-num{
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+  }
+  .step-label{
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 2px;
+  }
+  .step-item.active .step-dot{ border-color: var(--accent); background: var(--accent); }
+  .step-item.active .step-label{ color: var(--text); }
+  .step-item.done .step-dot{ border-color: var(--ok); background: var(--ok); }
+  .step-item:hover .step-label{ color: var(--text); }
+
+  .rail-foot{
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line-soft);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    line-height: 1.6;
+  }
+
+  /* ===== Language toggle ===== */
+  .lang-toggle{
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 14px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface);
+    cursor: pointer;
+    padding: 0;
+    font-family: var(--mono);
+  }
+  .lang-toggle span{
+    padding: 4px 10px;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    transition: background .15s ease, color .15s ease;
+  }
+  .lang-toggle span.on{
+    background: var(--accent);
+    color: #fff9f2;
+    font-weight: 600;
+  }
+  .lang-toggle:hover{ border-color: var(--accent); }
+  .lang-toggle:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ===== Main stage ===== */
+  .stage{
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  .panels{ flex: 1; position: relative; }
+  .panel{
+    display: none;
+    padding: 56px 64px 40px;
+    max-width: 880px;
+    animation: rise .35s ease;
+  }
+  @media (max-width: 640px){ .panel{ padding: 36px 22px 28px; } }
+  .panel.active{ display: block; }
+  @keyframes rise{
+    from{ opacity: 0; transform: translateY(8px); }
+    to{ opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .panel{ animation: none; }
+  }
+
+  .kicker{
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .kicker .date{ color: var(--text-faint); text-transform: none; letter-spacing: 0; }
+
+  h1.panel-title{
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(28px, 4vw, 40px);
+    line-height: 1.15;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .panel-sub{
+    font-family: var(--sans);
+    font-size: 15px;
+    color: var(--text-dim);
+    max-width: 62ch;
+    margin: 0 0 32px;
+    line-height: 1.6;
+  }
+
+  .beat{
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .beat:first-of-type{ border-top: none; }
+  .beat-tag{
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding-top: 3px;
+  }
+  .beat-tag.problem{ color: var(--danger); }
+  .beat-tag.decision{ color: var(--accent); }
+  .beat-tag.result{ color: var(--ok); }
+  .beat-body h3{
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 15px;
+    margin: 0 0 6px;
+  }
+  .beat-body p{
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text-dim);
+    margin: 0 0 8px;
+  }
+  .beat-body p:last-child{ margin-bottom: 0; }
+  .beat-body code{
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+
+  .codeblock{
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.65;
+    overflow-x: auto;
+    margin: 10px 0 8px;
+    white-space: pre;
+  }
+  .codeblock .c1{ color: #8a8270; }
+  .codeblock .num{ color: var(--accent-2); }
+
+  .stat-row{
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 10px 0 8px;
+  }
+  .stat{
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    padding: 10px 16px;
+    min-width: 120px;
+  }
+  .stat .num{
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .num .arrow{ color: var(--text-faint); font-weight: 400; font-size: 15px; padding: 0 4px; }
+  .stat .lbl{ font-size: 10.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+  .stat.good .num{ color: var(--ok); }
+
+  .commit-chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 5px;
+    padding: 3px 8px;
+    margin: 2px 4px 2px 0;
+  }
+  .commit-chip .hash{ color: var(--accent); }
+
+  .arch-mini{
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 18px 0 6px;
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .arch-box{
+    flex: 1;
+    padding: 14px 12px;
+    text-align: center;
+    border-right: 1px solid var(--line-soft);
+  }
+  .arch-box:last-child{ border-right: none; }
+  .arch-box.nocuda{ background: var(--surface); }
+  .arch-box.cuda{ background: var(--surface-2); }
+  .arch-box .t{ font-family: var(--mono); font-size: 11.5px; font-weight: 600; }
+  .arch-box .d{ font-size: 10.5px; color: var(--text-faint); margin-top: 3px; }
+  .arch-box.nocuda .t{ color: #3a5f8a; }
+  .arch-box.cuda .t{ color: var(--ok); }
+
+  .threat-scale{ display: flex; gap: 8px; margin: 14px 0 6px; flex-wrap: wrap; }
+  .threat-pill{
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .threat-pill .dot{ width: 7px; height: 7px; border-radius: 50%; }
+
+  /* ===== Nav footer ===== */
+  .stage-nav{
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 64px;
+    background: var(--bg);
+    border-top: 1px solid var(--line-soft);
+  }
+  @media (max-width: 640px){ .stage-nav{ padding: 14px 22px; } }
+  .nav-btn{
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 18px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color .15s ease, transform .1s ease;
+  }
+  .nav-btn:hover{ border-color: var(--accent); }
+  .nav-btn:active{ transform: scale(0.98); }
+  .nav-btn:disabled{ opacity: 0.35; cursor: default; }
+  .nav-btn:disabled:hover{ border-color: var(--line); }
+  .nav-btn.primary{ background: var(--accent); border-color: var(--accent); color: #fff9f2; }
+  .nav-btn.primary:hover{ border-color: var(--accent-2); background: var(--accent-2); }
+  .nav-btn:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .progress-text{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  /* ===== Figures (diagrams) ===== */
+  figure.fig{ margin: 20px 0 8px; }
+  .fig-card{
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 9px;
+    padding: 18px 18px 6px;
+    overflow-x: auto;
+  }
+  .fig-card svg{ display: block; max-width: 100%; height: auto; }
+  figcaption{
+    font-size: 12px;
+    color: var(--text-faint);
+    line-height: 1.55;
+    margin-top: 10px;
+    padding: 0 2px 2px;
+  }
+
+  /* ===== Deep-dive code panels ===== */
+  .code-panel{
+    margin: 12px 0 8px;
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .code-panel-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .code-panel-head .fname{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .code-panel-head .flabel{
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .code-panel .codeblock{
+    margin: 0;
+    border-radius: 0;
+  }
+  .codeblock .kw{ color: #d6ab5f; }
+  .codeblock .str{ color: #9fb98a; }
+  .codeblock .fn{ color: #8fb3d9; }
+
+  .explain-box{
+    background: var(--surface);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 7px 7px 0;
+    padding: 14px 18px;
+    margin: 10px 0 8px;
+  }
+  .explain-box h4{
+    font-family: var(--sans);
+    font-size: 12.5px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10.5px;
+  }
+  .explain-box p{
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--text-dim);
+    margin: 0 0 8px;
+  }
+  .explain-box p:last-child{ margin-bottom: 0; }
+  .explain-box code{
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+
+  /* ===== Q&A block (entrevista) ===== */
+  .qa-section{
+    margin-top: 34px;
+    padding-top: 22px;
+    border-top: 2px solid var(--line);
+  }
+  .qa-section-head{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .qa-section-head .icon{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 2px 7px;
+    letter-spacing: 0.04em;
+  }
+  .qa-section-head h3{
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 14px;
+    margin: 0;
+  }
+  .qa-item{
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .qa-q{
+    all: unset;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 13px 16px;
+    cursor: pointer;
+    box-sizing: border-box;
+  }
+  .qa-q:focus-visible{ outline: 2px solid var(--accent); outline-offset: -2px; }
+  .qa-q .qmark{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    flex-shrink: 0;
+    line-height: 1.5;
+  }
+  .qa-q .qtext{
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--text);
+    line-height: 1.5;
+    flex: 1;
+  }
+  .qa-q .chev{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    flex-shrink: 0;
+    transition: transform .15s ease;
+    line-height: 1.5;
+  }
+  .qa-item.open .qa-q .chev{ transform: rotate(90deg); }
+  .qa-a{
+    display: none;
+    padding: 0 16px 16px 40px;
+  }
+  .qa-item.open .qa-a{ display: block; }
+  .qa-a p{
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--text-dim);
+    margin: 0 0 8px;
+  }
+  .qa-a p:last-child{ margin-bottom: 0; }
+  .qa-a code{
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+
+  /* ===== Pólya beat tags ===== */
+  .beat-tag.entender{ color: var(--warn); }
+  .beat-tag.simular{ color: #7a5aa8; }
+  .beat-tag.escribir{ color: var(--accent); }
+  .beat-tag.medir{ color: var(--ok); }
+  .beat-tag.mirar{ color: var(--danger); }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .beat-tag.simular{ color:#b39ddb; } }
+  :root[data-theme="dark"] .beat-tag.simular{ color:#b39ddb; }
+  @media (max-width: 640px){
+    .beat{ grid-template-columns: 1fr; gap: 6px; }
+  }
+
+  .polya{ display:flex; flex-wrap:wrap; gap:6px; margin: 4px 0 22px; }
+  .polya span{ font-family: var(--mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase;
+    border:1px solid var(--line-soft); border-radius: 999px; padding: 3px 10px; background: var(--surface); }
+  .polya .entender{ color: var(--warn); } .polya .simular{ color:#7a5aa8; } .polya .escribir{ color: var(--accent); }
+  .polya .medir{ color: var(--ok); } .polya .mirar{ color: var(--danger); }
+
+  /* ===== Tables ===== */
+  .tbl-wrap{ overflow-x:auto; margin: 10px 0 8px; border:1px solid var(--line-soft); border-radius: 8px; background: var(--surface); }
+  table.tbl{ border-collapse: collapse; width:100%; font-size: 13px; }
+  table.tbl th, table.tbl td{ padding: 7px 12px; text-align:left; border-bottom:1px solid var(--line-soft); white-space: nowrap; }
+  table.tbl th{ font-family: var(--mono); font-size: 10.5px; letter-spacing:.05em; text-transform: uppercase; color: var(--text-faint); background: var(--surface-2); }
+  table.tbl td{ color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  table.tbl td.n{ font-family: var(--mono); color: var(--text); }
+  table.tbl tr:last-child td{ border-bottom: none; }
+  table.tbl tr.weak td{ color: var(--danger); }
+
+  /* ===== Honesty box ===== */
+  .caveat{ background: var(--danger-soft); border-left: 3px solid var(--danger); border-radius: 0 7px 7px 0; padding: 12px 16px; margin: 10px 0 8px; }
+  .caveat h4{ margin:0 0 6px; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color: var(--danger); font-weight:700; }
+  .caveat p{ margin:0 0 6px; font-size:13.5px; line-height:1.6; color: var(--text); }
+  .caveat p:last-child{ margin-bottom:0; }
+  .caveat code, .beat-body li code{ font-family: var(--mono); font-size:.9em; background: var(--surface-2); padding:1px 5px; border-radius:4px; }
+  .beat-body ul{ margin: 4px 0 8px; padding-left: 18px; color: var(--text-dim); font-size: 14px; line-height: 1.65; }
+
+  /* ===== Pitch (summary panel) ===== */
+  .pitch{ background: var(--surface); border:1px solid var(--line-soft); border-radius: 10px; padding: 18px 20px; margin: 0 0 24px; }
+  .pitch p{ margin: 0 0 10px; font-size: 15px; line-height: 1.7; color: var(--text); }
+  .pitch p:last-child{ margin-bottom: 0; }
+  .pitch .lbl{ font-family: var(--mono); font-size: 10.5px; letter-spacing:.08em; text-transform: uppercase; color: var(--accent); display:block; margin-bottom: 8px; }
+
+  /* ===== SVG text classes ===== */
+  .fig-card svg{ color: var(--text-dim); }
+  .s-box{ fill: var(--surface-2); stroke: var(--line); }
+  .s-box-ok{ fill: var(--ok-soft); stroke: var(--ok); }
+  .s-box-bad{ fill: var(--danger-soft); stroke: var(--danger); }
+  .s-t{ fill: var(--text); font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .s-d{ fill: var(--text-faint); font-family: var(--sans); font-size: 10.5px; }
+  .s-ok{ fill: var(--ok); font-family: var(--mono); font-size: 11px; }
+  .s-bad{ fill: var(--danger); font-family: var(--mono); font-size: 11px; }
+  .s-line{ stroke: currentColor; stroke-width: 1.4; fill: none; }
+
+  .rail-links{ margin-top: 10px; display:flex; flex-direction: column; gap: 4px; }
+  .rail-links a{ color: var(--text-dim); text-decoration: none; font-family: var(--mono); font-size: 10.5px; }
+  .rail-links a:hover{ color: var(--accent); }
+  .beat-body a, .pitch a, .explain-box a{ color: var(--accent-2); }
+
+  /* ===== Global map ===== */
+  .fig.map{ margin: 0 0 26px; }
+  .map-card{ padding: 10px 12px 4px; }
+  .map-card svg{ min-width: 640px; }
+  .map-node{ cursor: pointer; }
+  .map-node rect{ fill: var(--surface); stroke: var(--line-soft); stroke-width: 1; transition: stroke .15s ease; }
+  .map-node .mt{ font-family: var(--mono); font-size: 12px; font-weight: 600; fill: var(--text-faint); }
+  .map-node .md{ font-family: var(--sans); font-size: 10px; font-weight: 400; fill: var(--text-faint); }
+  .map-node.m-on rect{ fill: var(--surface-2); stroke: var(--accent); stroke-width: 2; }
+  .map-node.m-on .mt{ fill: var(--accent); }
+  .map-node.m-on .md{ fill: var(--text-dim); }
+  .map-node:hover rect, .map-node:focus-visible rect{ stroke: var(--accent-2); }
+  .map-node:focus{ outline: none; }
+
+  /* ===== Layout fixes + compact mobile rail ===== */
+  .shell{ grid-template-columns: 260px minmax(0, 1fr); }
+  .stage{ min-width: 0; }
+  @media (max-width: 860px){
+    .shell{ grid-template-columns: minmax(0, 1fr); }
+    .rail{ padding: 16px 16px 12px; }
+    .rail-head{ margin-bottom: 10px; }
+    .steps{ display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; flex: none; }
+    .steps::before{ display: none; }
+    .step-item{ padding: 0; flex: 0 0 auto; }
+    .step-dot{ display: none; }
+    .step-btn{ border: 1px solid var(--line-soft); border-radius: 8px; padding: 6px 10px; max-width: 190px; background: var(--surface); }
+    .step-item.active .step-btn{ border-color: var(--accent); }
+    .step-label{ font-size: 12.5px; }
+    .rail-foot{ margin-top: 10px; padding-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .rail-foot > span{ display: none; }
+    .rail-links{ margin-top: 0; }
+    .lang-toggle{ margin-top: 0; }
+    .stage-nav{ padding: 12px 16px; }
+  }
+  .beat{ grid-template-columns: 108px minmax(0, 1fr); }
+  .beat-body{ min-width: 0; }
+  @media (max-width: 640px){ .beat{ grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 860px){
+    .rail{ position: static; height: auto; overflow: visible; }
+    .stage{ min-height: auto; }
+  }
+  @media (max-width: 640px){
+    .fig-card svg{ min-width: 560px; }
+  }
+
+</style>
+</head>
+<body>
+<noscript><p style="padding:24px">Esta página necesita JavaScript. / This page needs JavaScript.</p></noscript>
+<div class="shell">
+  <nav class="rail" id="rail">
+    <div class="rail-head">
+      <p class="rail-eyebrow" id="railEyebrow"></p>
+      <p class="rail-title" id="railTitle"></p>
+    </div>
+    <ol class="steps" id="steps"></ol>
+    <div class="rail-foot">
+      <span id="railFoot"></span>
+      <div class="rail-links" id="railLinks"></div>
+      <button class="lang-toggle" id="langToggle" aria-label="Cambiar idioma / Switch language">
+        <span id="langEs">ES</span><span id="langEn">EN</span>
+      </button>
+    </div>
+  </nav>
+  <main class="stage">
+    <div class="panels" id="panels"></div>
+    <div class="stage-nav">
+      <button class="nav-btn" id="prevBtn"></button>
+      <span class="progress-text" id="progressText"></span>
+      <button class="nav-btn primary" id="nextBtn"></button>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ===== Content helpers ===== */
+let figCounter = 0;
+function fig(svgInner, viewBox, caption, ariaLabel){
+  figCounter++;
+  const mid = `arrow-fig-${figCounter}`;
+  const withIds = svgInner.replace(/url\(#arrow\)/g, `url(#${mid})`);
+  return `<figure class="fig"><div class="fig-card">
+      <svg viewBox="${viewBox}" role="img" aria-label="${ariaLabel}">
+        <defs><marker id="${mid}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+        ${withIds}
+      </svg></div><figcaption>${caption}</figcaption></figure>`;
+}
+function code(fname, label, body){
+  return `<div class="code-panel"><div class="code-panel-head"><span class="fname">${fname}</span><span class="flabel">${label}</span></div>
+    <div class="codeblock">${body}</div></div>`;
+}
+function explain(title, body){ return `<div class="explain-box"><h4>${title}</h4>${body}</div>`; }
+function caveat(title, body){ return `<div class="caveat"><h4>${title}</h4>${body}</div>`; }
+function table(head, rows, weakRows = []){
+  return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r, i) => `<tr class="${weakRows.includes(i) ? 'weak' : ''}">${r.map((c, j) => `<td class="${j > 0 ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function stats(items){
+  return `<div class="stat-row">${items.map(s => `<div class="stat ${s.good ? 'good' : ''}"><div class="num">${s.num}</div><div class="lbl">${s.lbl}</div></div>`).join('')}</div>`;
+}
+/* Shared SVG figures (language-neutral parts) */
+function pipelineSvg(labels){
+  // labels: [[title, desc] x5]
+  return labels.map(([t, d], i) => {
+    const x = 20 + i * 196;
+    return `<rect class="s-box" x="${x}" y="24" width="168" height="62" rx="7"/>
+      <text class="s-t" x="${x + 84}" y="50" text-anchor="middle">${t}</text>
+      <text class="s-d" x="${x + 84}" y="70" text-anchor="middle">${d}</text>
+      ${i < labels.length - 1 ? `<line class="s-line" x1="${x + 168}" y1="55" x2="${x + 192}" y2="55" marker-end="url(#arrow)"/>` : ''}`;
+  }).join('');
+}
+
+const PAGE = {
+  slug: 'vision-fine-tuning',
+  ui: {
+    es: {
+      docTitle: 'Cómo se construyó Vision Fine-Tuning',
+      railAria: 'Fases del proyecto', railEyebrow: 'vision-fine-tuning · bitácora', railTitle: 'Cómo se construyó',
+      railFoot: 'fuente: git log · docs/ · código<br>dic 2025 → sep 2026 · 1 autor',
+      links: [{href:'https://github.com/robertteleng/vision-fine-tuning', label:'↗ código en GitHub'}],
+      prev: '← Anterior', next: 'Siguiente →', end: 'Fin ✓',
+      phase: 'Fase', summaryKicker: 'Resumen', progress: (a, b) => a === 0 ? `Resumen · ${b} fases` : `Fase ${a} de ${b}`,
+      qaHeading: 'Preguntas que te haría un entrevistador, con respuesta',
+      tags: {entender:'Entender', simular:'Simular', escribir:'Escribir', medir:'Medir', mirar:'Mirar atrás'},
+      mapLabel: 'Mapa global del sistema con la parte de esta fase resaltada',
+      mapCaption: 'Mapa global: en naranja, la parte del sistema que trata esta fase. Pulsa una caja para saltar a su fase.'
+    },
+    en: {
+      docTitle: 'How Vision Fine-Tuning was built',
+      railAria: 'Project phases', railEyebrow: 'vision-fine-tuning · build log', railTitle: 'How it was built',
+      railFoot: 'source: git log · docs/ · code<br>Dec 2025 → Sep 2026 · 1 author',
+      links: [{href:'https://github.com/robertteleng/vision-fine-tuning', label:'↗ code on GitHub'}],
+      prev: '← Previous', next: 'Next →', end: 'End ✓',
+      phase: 'Phase', summaryKicker: 'Summary', progress: (a, b) => a === 0 ? `Summary · ${b} phases` : `Phase ${a} of ${b}`,
+      qaHeading: 'Questions an interviewer would ask, with answers',
+      tags: {entender:'Understand', simular:'Simulate', escribir:'Write', medir:'Measure', mirar:'Look back'},
+      mapLabel: 'Global map of the system with this phase highlighted',
+      mapCaption: 'Global map: orange marks the part of the system this phase covers. Click a box to jump to its phase.'
+    }
+  },
+  map: {
+    es: {
+      nodes: [
+        {id:'datos', t:'Datos', d:'vídeo · COCO · OI V7'},
+        {id:'anotar', t:'Anotar', d:'template · G-DINO'},
+        {id:'dataset', t:'Dataset', d:'YOLO · split'},
+        {id:'entrenar', t:'Entrenar', d:'YOLO26 fine-tune'},
+        {id:'evaluar', t:'Evaluar', d:'mAP por clase'},
+        {id:'exportar', t:'Exportar', d:'TensorRT FP16'},
+        {id:'usar', t:'Usar', d:'AriaGuard'}
+      ],
+      bands: [
+        {id:'framework', t:'Framework', d:'src/ · Gradio · CLI · uv'},
+        {id:'verificar', t:'Verificar', d:'pytest · benchmark'}
+      ]
+    },
+    en: {
+      nodes: [
+        {id:'datos', t:'Data', d:'video · COCO · OI V7'},
+        {id:'anotar', t:'Annotate', d:'template · G-DINO'},
+        {id:'dataset', t:'Dataset', d:'YOLO · split'},
+        {id:'entrenar', t:'Train', d:'YOLO26 fine-tune'},
+        {id:'evaluar', t:'Evaluate', d:'per-class mAP'},
+        {id:'exportar', t:'Export', d:'TensorRT FP16'},
+        {id:'usar', t:'Use', d:'AriaGuard'}
+      ],
+      bands: [
+        {id:'framework', t:'Framework', d:'src/ · Gradio · CLI · uv'},
+        {id:'verificar', t:'Verify', d:'pytest · benchmark'}
+      ]
+    }
+  },
+  steps: {}
+};
+
+PAGE.steps.es = [
+/* ───────────────────────── 0 · RESUMEN ───────────────────────── */
+{
+  id: 'resumen', label: 'El proyecto en 2 minutos', date: 'dic 2025 → sep 2026', focus: 'all',
+  title: 'Un detector de obstáculos de 24 clases, y el framework para entrenarlo',
+  sub: 'Esta página cuenta cómo se construyó el proyecto, fase a fase, con el código y las métricas reales, incluidas las que salieron mal. Sirve para entenderlo, para reaprenderlo y para explicarlo en una entrevista.',
+  intro: `
+  <div class="pitch">
+    <span class="lbl">Pitch</span>
+    <p><strong>Problema.</strong> Una persona ciega que camina con unas gafas con cámara necesita que el sistema detecte puertas, escaleras, farolas o sillas de ruedas. Los modelos preentrenados en COCO no conocen esas clases.</p>
+    <p><strong>Qué hice.</strong> Un framework en Python que cubre el ciclo completo: auto-anotar imágenes con texto (Grounding DINO), entrenar YOLO26, evaluar, exportar a TensorRT y medir la velocidad. Con él entrené <code>yolo26s_nav</code>, un modelo de 24 clases que usa AriaGuard.</p>
+    <p><strong>Resultado honesto.</strong> Va rápido (451 FPS en TensorRT FP16), pero la precisión es modesta: mAP50 de 0.47. Las clases más importantes para el producto, como las escaleras, son de las más débiles. El proyecto lo he hecho solo: 133 commits entre diciembre de 2025 y septiembre de 2026.</p>
+  </div>
+  ${stats([
+    {num:'0.470', lbl:'mAP50 · 24 clases'},
+    {num:'0.311', lbl:'mAP50-95'},
+    {num:'451', lbl:'FPS · TensorRT FP16', good:true},
+    {num:'14K', lbl:'imágenes de entrenamiento'}
+  ])}
+  ${explain('Cómo leer esta web: el método de 5 pasos', `<p>Cada fase se cuenta con el mismo método, una adaptación de <em>How to Solve It</em> de Pólya (1945):</p>`)}
+  ${fig(`
+    ${[['1 · Entender','qué problema es'],['2 · Simular','un caso con números'],['3 · Escribir','código y decisión'],['4 · Medir','qué salió y cómo'],['5 · Mirar atrás','qué cambiaría']].map(([t,d],i)=>{
+      const x = 16 + i*186;
+      return `<rect class="s-box" x="${x}" y="20" width="160" height="56" rx="7"/>
+      <text class="s-t" x="${x+80}" y="44" text-anchor="middle">${t}</text>
+      <text class="s-d" x="${x+80}" y="62" text-anchor="middle">${d}</text>
+      ${i<4?`<line class="s-line" x1="${x+160}" y1="48" x2="${x+183}" y2="48" marker-end="url(#arrow)"/>`:''}`;}).join('')}
+    <path class="s-line" d="M 840 76 C 840 118, 96 118, 96 80" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+    <text class="s-d" x="468" y="112" text-anchor="middle">lo aprendido alimenta la siguiente vuelta</text>
+  `, '0 0 950 126', 'Pólya tenía cuatro pasos. «Concebir un plan» se convierte en simular un caso concreto, y «examinar la solución» se parte en medir y mirar atrás, porque el código se puede ejecutar y contradecirte.', 'Flujo de cinco pasos: entender, simular, escribir, medir, mirar atrás, con retorno al inicio')}
+  `,
+  beats: [],
+  qa: [
+    {q:'Cuéntame este proyecto en dos minutos.', a:`<p>Sigue el orden de los 5 pasos. <strong>Entender:</strong> un sistema de navegación asistida necesitaba detectar clases que COCO no tiene, como puertas o escaleras. <strong>Simular y escribir:</strong> no se pueden añadir clases a YOLO sin que olvide las originales, así que combiné un subset de COCO con imágenes de Open Images, remapeando los IDs, y construí un framework para anotar, entrenar y exportar. <strong>Medir:</strong> 451 FPS en TensorRT FP16, pero un mAP50 de 0.47, con clases débiles justo donde más importa. <strong>Mirar atrás:</strong> el paso de combinar datasets no está automatizado, nunca evalué con vídeo real de las gafas y la validación de la primera versión estaba contaminada. Eso es lo primero que arreglaría.</p>`},
+    {q:'¿Cuál fue exactamente tu papel?', a:`<p>Todo: definir el problema, los datos, el código, los entrenamientos y los benchmarks. Soy el único autor de los 133 commits. Usé asistentes de IA como apoyo, pero las decisiones y la validación de resultados son mías. Por eso puedo explicar cada número de esta página y también sus límites.</p>`}
+  ]
+},
+
+/* ───────────────────────── 1 · ORIGEN VR ───────────────────────── */
+{
+  id: 'origen', label: 'El origen: un detector para VR', date: '3–8 dic 2025 · d319f58 → ae29ec0',
+  focus: ['datos','anotar','dataset','entrenar','evaluar'],
+  title: 'Primero, un solo objeto en un mundo virtual',
+  sub: 'Antes de ser un framework, el proyecto era un detector de un único objeto: pilares con un patrón de tablero amarillo y negro, dentro de un entorno de Unreal Engine. Ahí aparecieron casi todos los problemas que vendrían después.',
+  beats: [
+    {tag:'entender', h:'Un vídeo, cero etiquetas', body:`<p>El punto de partida era un vídeo capturado en VR y una imagen recortada del pilar. Anotar a mano cientos de frames era lento, y la herramienta clásica, LabelImg, se colgaba en Python 3.12 (<code>drawLine(): argument 1 has unexpected type 'float'</code>).</p>
+    <p>La pregunta real no era cómo entrenar YOLO, sino <strong>cómo conseguir etiquetas sin etiquetar a mano</strong>.</p>`},
+    {tag:'simular', h:'Template matching con un frame concreto', body:`<p>La idea es deslizar la imagen del pilar (el template) sobre el frame y calcular en cada posición cuánto se parecen. Donde la similitud supera un umbral, hay una detección.</p>
+    ${fig(`
+      <rect class="s-box" x="20" y="20" width="250" height="140" rx="6"/>
+      <text class="s-d" x="30" y="38">frame 1280×720</text>
+      <rect x="70" y="60" width="44" height="80" rx="3" fill="none" style="stroke:var(--accent)" stroke-width="2"/>
+      <rect x="180" y="60" width="44" height="80" rx="3" fill="none" style="stroke:var(--danger)" stroke-width="2" stroke-dasharray="4 3"/>
+      <text class="s-ok" x="92" y="154" text-anchor="middle">0.93</text>
+      <text class="s-bad" x="202" y="154" text-anchor="middle">0.74</text>
+      <line class="s-line" x1="270" y1="90" x2="320" y2="90" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="325" y="30" width="250" height="44" rx="6"/>
+      <text class="s-t" x="450" y="57" text-anchor="middle">umbral 0.70 → 2 detecciones</text>
+      <rect class="s-box-ok" x="325" y="96" width="250" height="44" rx="6"/>
+      <text class="s-t" x="450" y="123" text-anchor="middle">umbral 0.85 → 1 detección</text>
+      <text class="s-bad" x="450" y="170" text-anchor="middle">el tablero se repite → falsos positivos</text>
+    `, '0 0 600 180', 'Simulación ilustrativa, con valores de ejemplo: el patrón de tablero se repite en zonas que no son el pilar. Con umbral 0.70 esas zonas pasan el filtro; al subirlo a 0.85–0.95 desaparecen, a cambio de perder pilares vistos en ángulos raros.', 'Template deslizando sobre un frame con dos puntuaciones y el efecto de dos umbrales')}
+    <p>El mismo razonamiento explica el siguiente fallo: un pilar <strong>invertido</strong>, con el negro arriba, se parece poco al template normal y no pasa el umbral. Hizo falta un segundo template.</p>`},
+    {tag:'escribir', h:'Un script por paso, con una persona revisando', body:`<p>Cada paso del flujo es un script independiente. La revisión humana (<code>review_annotations.py</code>) está en medio a propósito: la auto-anotación propone y una persona decide.</p>
+    ${fig(`
+      ${pipelineSvg([['auto_annotate','template + NMS'],['visualize','ver cajas'],['review','humano acepta'],['split_dataset','80/20 seed 42'],['train · eval','YOLOv12s']])}
+      <path class="s-line" d="M 694 86 C 694 130, 104 130, 104 90" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+      <text class="s-bad" x="400" y="126" text-anchor="middle">pilares invertidos no detectados → template nuevo → re-anotar</text>
+    `, '0 0 1000 140', 'El flujo de la primera versión. La flecha de vuelta es el bucle real que hubo que recorrer cuando el modelo no detectaba los pilares invertidos.', 'Pipeline de cinco scripts con bucle de retorno')}
+    ${code('scripts/split_dataset.py','división train/val', [
+      '<span class="kw">def</span> <span class="fn">split_pairs</span>(pairs, train_ratio=<span class="num">0.8</span>, seed=<span class="num">42</span>):',
+      '    random.seed(seed)',
+      '    shuffled = pairs.copy()',
+      '    random.shuffle(shuffled)          <span class="c1"># ← frames de UN vídeo, barajados</span>',
+      '    split_idx = int(len(shuffled) * train_ratio)',
+      '    <span class="kw">return</span> shuffled[:split_idx], shuffled[split_idx:]'
+    ].join('\n'))}`,
+    chips:['0ec9c97 auto-annotate template matching','f83a122 review_annotations','699d080 evaluate, export, benchmark']},
+    {tag:'medir', h:'Cuatro entrenamientos', body:`${table(['#','Modelo','Datos','mAP50-95','Nota'],[
+      ['1','YOLOv8n · 10 ép.','555 train','62.7%','baseline'],
+      ['2','YOLOv12s · 50 ép.','555 train','84.7%','+22 puntos por modelo mayor'],
+      ['3','YOLOv12s · 100 ép.','+7 invertidos','87.4%','insuficiente'],
+      ['4','YOLOv12s · 100 ép.','+59 invertidos','87.4%','final']
+    ])}
+    ${stats([{num:'98.7%', lbl:'mAP50 final'},{num:'99.2%', lbl:'recall'},{num:'71 → 180', lbl:'FPS PyTorch → TensorRT', good:true},{num:'RTX 2060', lbl:'6 GB'}])}
+    <p>Los modelos detectaban "fantasmas" con confianza de 0.50–0.55, así que subí el umbral de inferencia de 0.25 a 0.65.</p>`,
+    chips:['9d30375 TensorRT 180 FPS']},
+    {tag:'mirar', h:'Ese 98.7% es optimista', body:`${caveat('Fuga de datos entre train y val', `<p>Todos los frames salen del mismo vídeo y <code>split_pairs</code> los baraja al azar. Dos frames consecutivos son casi idénticos, así que es muy probable que el modelo se evaluara con imágenes prácticamente vistas en el entrenamiento. El 98.7% mide memoria del vídeo, no generalización.</p><p><strong>Qué haría hoy:</strong> dividir por bloques de tiempo o por escenas, nunca frame a frame.</p>`)}
+    <ul>
+      <li><strong>Añadir 59 frames invertidos no movió el mAP50-95</strong> (87.4% → 87.4%). O la validación casi no tenía pilares invertidos, o la métrica agregada tapaba el caso que importaba. No lo comprobé, y debería haber medido ese subconjunto por separado.</li>
+      <li><strong>Subir el umbral a 0.65 es un parche</strong>: quita fantasmas, pero también detecciones reales. La solución de fondo es añadir ejemplos negativos difíciles.</li>
+      <li><strong>Lo que sí funcionó:</strong> auto-anotar más revisión humana. Es la idea que sobrevive en todo el proyecto.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'Tu primer modelo tiene un mAP50 del 98.7%. ¿Te lo crees?', a:`<p>No del todo. Los frames vienen de un único vídeo y el split es aleatorio frame a frame, así que en validación hay frames casi idénticos a los de entrenamiento. Es fuga de datos. El número dice que el modelo reconoce ese vídeo, no que funcione en otro. Para creérmelo haría un split por bloques temporales y probaría con otra grabación.</p>`},
+    {q:'Subiste el umbral de confianza de 0.25 a 0.65. ¿Qué coste tiene?', a:`<p>Menos falsos positivos a cambio de menos recall: los pilares reales con confianza entre 0.25 y 0.65 dejan de detectarse. En un sistema de seguridad para peatones, perder un obstáculo real es peor que un aviso de más. Lo correcto sería elegir el umbral con la curva precision-recall en validación y atacar la causa con ejemplos negativos, no fijarlo a ojo.</p>`},
+    {q:'Añadiste 59 frames de pilares invertidos y el mAP50-95 no cambió. ¿Cómo lo interpretas?', a:`<p>Una métrica agregada puede esconder el subgrupo que te importa. Si la validación tiene pocos pilares invertidos, mejorar en ellos casi no mueve la media. Lo que falta es evaluar ese subconjunto por separado. No lo hice, y es una de las lecciones que me llevo.</p>`}
+  ]
+},
+
+/* ───────────────────────── 2 · ZERO-SHOT ───────────────────────── */
+{
+  id: 'zeroshot', label: 'Anotar sin anotar: zero-shot', date: '15 dic 2025 · a6bf6ad, 6b5a4a7',
+  focus: ['anotar'],
+  title: 'Describir el objeto con texto en vez de recortarlo',
+  sub: 'Con template matching, cada aspecto nuevo del objeto necesita otro template, y eso no escala. Así que probé modelos que detectan a partir de una frase: YOLO-World falló y Grounding DINO funcionó.',
+  beats: [
+    {tag:'entender', h:'El cuello de botella eran las etiquetas, no el modelo', body:`<p>Entrenar YOLO es un comando. Conseguir miles de cajas bien puestas es semanas de trabajo. Si un modelo <em>zero-shot</em> (que detecta clases que no ha visto, guiado por texto) propone las cajas y una persona solo revisa, el coste baja un orden de magnitud.</p>`},
+    {tag:'simular', h:'Una imagen, de principio a fin', body:`${fig(`
+      <rect class="s-box" x="16" y="20" width="170" height="44" rx="6"/><text class="s-t" x="101" y="47" text-anchor="middle">imagen 1280×720</text>
+      <rect class="s-box" x="16" y="80" width="170" height="44" rx="6"/><text class="s-t" x="101" y="100" text-anchor="middle">"yellow and black</text><text class="s-t" x="101" y="115" text-anchor="middle">checkered box."</text>
+      <line class="s-line" x1="186" y1="42" x2="226" y2="66" marker-end="url(#arrow)"/><line class="s-line" x1="186" y1="102" x2="226" y2="80" marker-end="url(#arrow)"/>
+      <rect class="s-box-ok" x="230" y="46" width="150" height="54" rx="6"/><text class="s-t" x="305" y="70" text-anchor="middle">Grounding DINO</text><text class="s-d" x="305" y="88" text-anchor="middle">tiny · transformers</text>
+      <line class="s-line" x1="380" y1="73" x2="415" y2="73" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="418" y="46" width="150" height="54" rx="6"/><text class="s-t" x="493" y="68" text-anchor="middle">cajas + scores</text><text class="s-d" x="493" y="86" text-anchor="middle">score ≥ 0.30</text>
+      <line class="s-line" x1="568" y1="73" x2="603" y2="73" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="606" y="46" width="260" height="54" rx="6"/><text class="s-t" x="736" y="68" text-anchor="middle">0 0.375 0.500 0.125 0.444</text><text class="s-d" x="736" y="86" text-anchor="middle">línea YOLO: clase cx cy w h</text>
+    `, '0 0 880 140', 'El flujo de una imagen. El texto termina en punto porque Grounding DINO separa las frases por puntos.', 'Imagen y texto entran en Grounding DINO, salen cajas, se filtran y se convierten a formato YOLO')}
+    ${explain('La conversión a mano, con números', `<p>Caja en píxeles <code>(x1, y1, x2, y2) = (400, 200, 560, 520)</code> en una imagen de 1280×720. YOLO quiere el centro y el tamaño normalizados entre 0 y 1:</p>
+    <p><code>cx = (400+560)/2/1280 = 0.375</code> · <code>cy = (200+520)/2/720 = 0.500</code> · <code>w = 160/1280 = 0.125</code> · <code>h = 320/720 = 0.444</code></p>
+    <p>Si normalizas con el ancho donde tocaba el alto, las cajas salen desplazadas y el entrenamiento no da error: aprende basura en silencio. Por eso existe <code>visualize_annotations.py</code>.</p>`)}`},
+    {tag:'escribir', h:'El núcleo del anotador', body:`${code('src/annotation.py','AutoAnnotator.annotate_image', [
+      '<span class="c1"># Grounding DINO separa frases por punto</span>',
+      'prompt = prompt <span class="kw">if</span> prompt.endswith(<span class="str">"."</span>) <span class="kw">else</span> prompt + <span class="str">"."</span>',
+      '',
+      'inputs = <span class="kw">self</span>.processor(images=pil_image, text=prompt, return_tensors=<span class="str">"pt"</span>).to(<span class="kw">self</span>.device)',
+      '<span class="kw">with</span> torch.no_grad():',
+      '    outputs = <span class="kw">self</span>.model(**inputs)',
+      '',
+      'results = <span class="kw">self</span>.processor.post_process_grounded_object_detection(',
+      '    outputs, input_ids=inputs.input_ids, target_sizes=[(height, width)])[<span class="num">0</span>]',
+      '',
+      'mask = results[<span class="str">"scores"</span>] >= threshold      <span class="c1"># 0.3 por defecto</span>',
+      'boxes = results[<span class="str">"boxes"</span>][mask].cpu().numpy()'
+    ].join('\n'))}
+    <p><strong>Decisión:</strong> cargar el modelo con Hugging Face <code>transformers</code> en vez de compilar el repo original. Instalarlo es trivial y la dependencia queda como <em>extra</em> opcional (<code>uv sync --extra annotation</code>).</p>`,
+    chips:['a6bf6ad YOLO-World','6b5a4a7 Grounding DINO']},
+    {tag:'medir', h:'Mismo conjunto, dos modelos', body:`${table(['Métrica (47 imágenes)','YOLO-World','Grounding DINO'],[
+      ['Imágenes con alguna detección','8.5%','100%'],
+      ['Detecciones totales','6','259'],
+      ['Rango de confianza','0.05–0.09','0.25–0.69'],
+      ['Velocidad','~25 img/s','~2 img/s']
+    ])}
+    <p>Con YOLO-World, prompts como <code>"yellow black checkered cube"</code> o <code>"yellow box"</code> dieron cero detecciones. Mi hipótesis, no verificada: su parte de lenguaje (CLIP) se entrenó con fotos reales y le cuesta con texturas sintéticas de VR.</p>`},
+    {tag:'mirar', h:'Detectar mucho no es detectar bien', body:`${caveat('Lo que la tabla no dice', `<p>"100% de cobertura" y "259 detecciones" miden <strong>cantidad</strong>, no si las cajas eran correctas. Salen 5.5 detecciones por imagen y nunca comparé con un conjunto etiquetado a mano, así que no sé cuántas eran falsas. En el diario escribí "43 veces mejor", y esa frase compara conteos, no calidad.</p>`)}
+    <ul>
+      <li><strong>Qué haría:</strong> etiquetar a mano unas 50 imágenes como <em>gold set</em> y medir precisión y recall del anotador con varios umbrales antes de fiarme de él.</li>
+      <li><strong>El trade-off de velocidad era aceptable</strong>: 12 veces más lento, pero la anotación es un proceso offline que se hace una vez.</li>
+      <li><strong>El riesgo de fondo:</strong> si entrenas con etiquetas de otro modelo, heredas sus errores sistemáticos. Lo que falle el anotador, el detector aprenderá a fallarlo.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'¿Cómo sabes que las anotaciones automáticas son buenas?', a:`<p>Con este proyecto, solo por inspección visual y la revisión con <code>review_annotations.py</code>. No es suficiente. Lo riguroso es un <em>gold set</em> etiquetado a mano y medir precisión y recall del anotador contra él, eligiendo el umbral según esa curva. Es lo primero que añadiría.</p>`},
+    {q:'YOLO-World es 12 veces más rápido. ¿Por qué no usarlo?', a:`<p>Porque en este dominio no detectaba casi nada: 8.5% de las imágenes con confianzas por debajo de 0.1. La velocidad no importa si la salida no sirve, y además anotar es un proceso offline. Si fuera inferencia en tiempo real, el trade-off sería otro.</p>`},
+    {q:'¿Qué riesgo tiene entrenar un detector con etiquetas generadas por otro modelo?', a:`<p>Que copia sus errores. Si Grounding DINO no ve pilares pequeños o a contraluz, esos casos entran como fondo y el detector aprende a ignorarlos. Se mitiga con revisión humana, un gold set para medir al anotador y añadiendo a mano los casos difíciles.</p>`}
+  ]
+},
+
+/* ───────────────────────── 3 · FRAMEWORK ───────────────────────── */
+{
+  id: 'framework', label: 'De script a framework', date: '15 ene – 20 feb 2026 · 02295c8, 53029a4, f03846c',
+  focus: ['framework'],
+  title: 'Separar la interfaz de la lógica, y quitar todo lo que decía "pilar"',
+  sub: 'El proyecto funcionaba para un objeto y una GPU. Para reutilizarlo con cualquier dataset hubo que partir un app.py de cientos de líneas y eliminar lo que estaba escrito a fuego.',
+  beats: [
+    {tag:'entender', h:'Todo vivía en app.py', body:`<p>La interfaz Gradio, el entrenamiento, la inferencia y la anotación estaban mezclados en un solo archivo. El refactor movió 839 líneas a módulos. Además, rutas, nombres de clase ("pillar") y parámetros de GPU estaban escritos a mano.</p>
+    <p>Consecuencia: probar una función exigía arrancar la interfaz, y cambiar de GPU o de dataset exigía editar código.</p>`},
+    {tag:'simular', h:'La misma llamada en tres máquinas', body:`<p><code>suggest_training_defaults()</code> decide los parámetros según la VRAM detectada:</p>
+    ${table(['Máquina','VRAM','batch','workers','cache','amp'],[
+      ['RTX 5060 Ti','16 GB','-1 (auto)','8','ram','sí'],
+      ['RTX 2060','6 GB','8','4','disco','sí'],
+      ['Portátil sin GPU','—','4','4','no','no']
+    ])}
+    <p><code>batch=-1</code> activa AutoBatch de Ultralytics, que estima cuántas imágenes caben en una fracción de la VRAM. Así el mismo <code>config.yaml</code> sirve en máquinas distintas.</p>`},
+    {tag:'escribir', h:'Tres capas', body:`${fig(`
+      <rect class="s-box" x="60" y="16" width="260" height="50" rx="7"/><text class="s-t" x="190" y="38" text-anchor="middle">app.py · Gradio</text><text class="s-d" x="190" y="55" text-anchor="middle">7 pestañas, sin lógica</text>
+      <rect class="s-box" x="480" y="16" width="260" height="50" rx="7"/><text class="s-t" x="610" y="38" text-anchor="middle">scripts/ · CLI</text><text class="s-d" x="610" y="55" text-anchor="middle">train, inference, export…</text>
+      <line class="s-line" x1="190" y1="66" x2="330" y2="104" marker-end="url(#arrow)"/><line class="s-line" x1="610" y1="66" x2="470" y2="104" marker-end="url(#arrow)"/>
+      <rect class="s-box-ok" x="40" y="108" width="720" height="62" rx="7"/>
+      <text class="s-t" x="400" y="130" text-anchor="middle">src/ · la lógica, importable y testeable</text>
+      <text class="s-d" x="400" y="152" text-anchor="middle">hardware · project · training · inference · dataset · annotation · benchmark</text>
+      <line class="s-line" x1="400" y1="170" x2="400" y2="196" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="200" y="200" width="400" height="40" rx="7"/><text class="s-t" x="400" y="225" text-anchor="middle">Ultralytics · PyTorch · transformers</text>
+    `, '0 0 800 250', 'La interfaz web y la CLI son dos puertas a la misma lógica. Si mañana hace falta una API REST, sería una tercera puerta sin tocar src/.', 'Arquitectura de tres capas')}
+    ${code('src/hardware.py','suggest_training_defaults', [
+      'vram = gpu.vram_gb',
+      '<span class="kw">if</span> vram >= <span class="num">16</span>:',
+      '    <span class="kw">return</span> {<span class="str">"batch"</span>: -<span class="num">1</span>, <span class="str">"workers"</span>: <span class="num">8</span>, <span class="str">"cache"</span>: <span class="str">"ram"</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}',
+      '<span class="kw">elif</span> vram >= <span class="num">8</span>:',
+      '    <span class="kw">return</span> {<span class="str">"batch"</span>: -<span class="num">1</span>, <span class="str">"workers"</span>: <span class="num">8</span>, <span class="str">"cache"</span>: <span class="str">"ram"</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}  <span class="c1"># ← idéntica a la de arriba</span>',
+      '<span class="kw">elif</span> vram >= <span class="num">4</span>:',
+      '    <span class="kw">return</span> {<span class="str">"batch"</span>: <span class="num">8</span>, <span class="str">"workers"</span>: <span class="num">4</span>, <span class="str">"cache"</span>: <span class="kw">True</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}'
+    ].join('\n'))}
+    <p>También migré de <code>pip</code> a <code>uv</code>, con <code>pyproject.toml</code> y extras opcionales, para que las dependencias pesadas (transformers, FiftyOne) solo se instalen si se usan.</p>`,
+    chips:['02295c8 split app.py into src/','53029a4 remove VR hardcoding','f03846c migrate to uv']},
+    {tag:'medir', h:'Un bug que la interfaz no dejaba ver', body:`<p>Tras actualizar PyTorch, la interfaz empezó a mostrar siempre "GPU: Not available" en una máquina con GPU. El atributo de memoria que leía el código no existía en esa versión. El <code>except Exception</code> se tragaba el <code>AttributeError</code> y devolvía "sin GPU" sin avisar.</p>
+    ${code('src/hardware.py','fix 0c5018d', [
+      '<span class="c1">- vram_mb = torch.cuda.get_device_properties(0).total_mem // (1024 * 1024)</span>',
+      '<span class="str">+ props = torch.cuda.get_device_properties(0)</span>',
+      '<span class="str">+ total_bytes = getattr(props, "total_memory", None) or getattr(props, "total_mem", 0)</span>',
+      '<span class="str">+ vram_mb = total_bytes // (1024 * 1024)</span>'
+    ].join('\n'))}`,
+    chips:['0c5018d GPU detection fix']},
+    {tag:'mirar', h:'El fix trató el síntoma', body:`${caveat('Sigue ahí', `<p>El <code>except Exception</code> que escondió el bug <strong>sigue en el código</strong>. La próxima vez que algo falle dentro de <code>detect_gpu()</code> volverá a pasar lo mismo. Como mínimo debería registrar la excepción. Mejor aún, capturar solo los errores esperados.</p>`)}
+    <ul>
+      <li><strong>Las ramas de 16 GB y 8 GB son idénticas.</strong> O la distinción sobra, o faltan parámetros distintos, como el <code>imgsz</code>. Es código que aparenta una decisión que no toma.</li>
+      <li><strong>Por verificar:</strong> <code>pyproject.toml</code> declara comandos (<code>fts-train</code>…) pero no tiene <code>[build-system]</code>, así que probablemente no se instalan. En el README uso <code>uv run python scripts/…</code>, que sí funciona.</li>
+      <li><strong>Lo que salió bien:</strong> gracias a la separación en <code>src/</code> existen tests unitarios que no necesitan arrancar Gradio.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'¿Por qué separar src/ de app.py y de scripts/?', a:`<p>Para tener una única implementación de cada cosa y poder testearla. Antes, entrenar desde la interfaz y desde la CLI eran dos caminos que podían divergir. Ahora los dos llaman a <code>src/</code>. Además, <code>src/</code> se importa sin cargar Gradio, y eso hace los tests rápidos y posibles en CI.</p>`},
+    {q:'Tu detect_gpu() tiene un except Exception. ¿Qué problema tiene?', a:`<p>Convierte cualquier error en un resultado válido ("no hay GPU"). Ya me pasó: un cambio de API de PyTorch hizo que la interfaz dijera que no había GPU, sin ningún error visible. Un <code>except</code> amplio es aceptable en el borde de la interfaz si registra el error. Dentro de la lógica, hay que capturar solo lo esperado y dejar que lo inesperado explote.</p>`},
+    {q:'¿Qué hace batch=-1 y cuándo no lo usarías?', a:`<p>Activa AutoBatch de Ultralytics, que prueba el uso de memoria y elige el batch que cabe en una fracción de la VRAM. No lo usaría cuando necesito reproducir un experimento exacto entre máquinas, porque el batch cambia la dinámica del entrenamiento, ni en una GPU compartida con otros procesos, porque la estimación puede fallar.</p>`}
+  ]
+},
+
+/* ───────────────────────── 4 · DATASET COMBINADO ───────────────────────── */
+{
+  id: 'dataset', label: '24 clases sin olvidar COCO', date: '20–21 feb 2026 · 39d1a9e, 6107f4e, 8883995',
+  focus: ['datos','dataset','entrenar','evaluar'],
+  title: 'No se pueden añadir clases a YOLO: hay que reentrenar con todas',
+  sub: 'Para navegación asistida hacían falta puertas, escaleras, farolas, señales, árboles y sillas de ruedas, sin perder personas, coches ni bicis. Esta fase es el núcleo técnico del proyecto.',
+  beats: [
+    {tag:'entender', h:'La cabeza de detección se sustituye entera', body:`<p>La última capa de YOLO tiene tantas salidas como clases. Si entrenas con 6 clases, la cabeza pasa a tener 6 salidas y el modelo <strong>olvida las 80 de COCO</strong>. Congelar el backbone (<code>freeze</code>) conserva las features, pero no las clases.</p>
+    <p>Por tanto, el modelo final debe entrenarse con <strong>todas las clases a la vez</strong>, en un único dataset.</p>`},
+    {tag:'simular', h:'Seguir una etiqueta hasta el dataset final', body:`${fig(`
+      <rect class="s-box" x="16" y="16" width="300" height="74" rx="7"/>
+      <text class="s-t" x="166" y="38" text-anchor="middle">COCO subset · FiftyOne</text>
+      <text class="s-d" x="166" y="56" text-anchor="middle">18 clases · IDs 0–17 · 8 000 / 2 000</text>
+      <text class="s-ok" x="166" y="76" text-anchor="middle">person → 0 (orden de la lista)</text>
+      <rect class="s-box" x="16" y="116" width="300" height="74" rx="7"/>
+      <text class="s-t" x="166" y="138" text-anchor="middle">nav_custom · Open Images V7</text>
+      <text class="s-d" x="166" y="156" text-anchor="middle">6 clases · IDs 0–5 · 3 608 / 571</text>
+      <text class="s-bad" x="166" y="176" text-anchor="middle">Stairs = 1 → ¡choca con bicycle!</text>
+      <line class="s-line" x1="316" y1="53" x2="400" y2="92" marker-end="url(#arrow)"/>
+      <line class="s-line" x1="316" y1="153" x2="400" y2="112" marker-end="url(#arrow)"/>
+      <text class="s-t" x="360" y="140" text-anchor="middle">+18</text>
+      <rect class="s-box-ok" x="404" y="66" width="250" height="74" rx="7"/>
+      <text class="s-t" x="529" y="90" text-anchor="middle">nav_combined</text>
+      <text class="s-d" x="529" y="108" text-anchor="middle">24 clases · 11 608 / 2 571</text>
+      <text class="s-ok" x="529" y="126" text-anchor="middle">Stairs = 19 · prefijos coco_/custom_</text>
+      <line class="s-line" x1="654" y1="103" x2="700" y2="103" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="704" y="72" width="170" height="62" rx="7"/>
+      <text class="s-t" x="789" y="98" text-anchor="middle">YOLO26s</text>
+      <text class="s-d" x="789" y="116" text-anchor="middle">cabeza de 24 salidas</text>
+    `, '0 0 890 200', 'Dos fuentes y un espacio de IDs. FiftyOne exporta COCO ya con IDs 0–17 según el orden de la lista de clases. El dataset propio también empieza en 0, así que hay que desplazarlo +18 o las escaleras se entrenarían como bicicletas.', 'Dos datasets se combinan remapeando IDs')}
+    ${explain('Una línea de label, antes y después', `<p>Archivo de nav_custom: <code>1 0.52 0.61 0.20 0.35</code>, que es Stairs con ID 1.</p><p>En nav_combined: <code>19 0.52 0.61 0.20 0.35</code>. Las coordenadas no cambian, solo la clase. Si el remapeo falla, no hay error: el modelo aprende que las escaleras son bicicletas y la métrica de ambas clases cae sin explicación aparente.</p>`)}`},
+    {tag:'escribir', h:'Descargar solo lo necesario', body:`${code('docs/TRAINING_PROCESS.md','subset de COCO con FiftyOne', [
+      'dataset = foz.load_zoo_dataset(',
+      '    <span class="str">"coco-2017"</span>, split=<span class="str">"train"</span>, label_types=[<span class="str">"detections"</span>],',
+      '    classes=[<span class="str">"person"</span>, <span class="str">"car"</span>, <span class="str">"bus"</span>, ...],   <span class="c1"># solo las relevantes</span>',
+      '    max_samples=<span class="num">8000</span>)',
+      '',
+      'view = dataset.filter_labels(<span class="str">"ground_truth"</span>, F(<span class="str">"label"</span>).is_in(MY_CLASSES), only_matches=<span class="kw">True</span>)',
+      'view.export(export_dir=<span class="str">"data/coco_nav/train"</span>, dataset_type=fo.types.YOLOv5Dataset,',
+      '            label_field=<span class="str">"ground_truth"</span>, classes=MY_CLASSES)'
+    ].join('\n'))}
+    <p><strong>Decisión:</strong> un subset (~4 GB) en vez de COCO completo (~20 GB). El modelo base ya vio COCO entero; solo necesita suficientes ejemplos para no olvidar, y clases como <em>pizza</em> o <em>toaster</em> no aportan a la navegación.</p>
+    <p>Entrenamiento: <code>uv run python scripts/train.py --model yolo26s.pt --data data/nav_combined/dataset.yaml --epochs 50</code>, sin <code>freeze</code>. Unos 122 s por época en la RTX 5060 Ti.</p>`,
+    chips:['39d1a9e fine-tuning strategy guide','8883995 track yolo26s_nav.pt']},
+    {tag:'medir', h:'0.47 de mAP50, con mucha dispersión por clase', body:`${stats([{num:'0.470', lbl:'mAP50'},{num:'0.311', lbl:'mAP50-95'},{num:'0.558', lbl:'precision'},{num:'0.462', lbl:'recall'}])}
+    ${table(['Clase','mAP50','Lectura'],[
+      ['Cat (COCO)','0.853','fuerte'],
+      ['Fire hydrant (COCO)','0.748','fuerte'],
+      ['Person (COCO)','0.738','fuerte'],
+      ['Wheelchair','0.696','la mejor de las propias'],
+      ['Tree','0.497',''],
+      ['Truck (COCO)','0.418','bajó respecto al modelo base'],
+      ['Traffic sign','0.417',''],
+      ['Door','0.410','mucha variedad interior/exterior'],
+      ['Stairs','0.318','crítica para el producto'],
+      ['Street light','0.044','solo 7 imágenes en validación']
+    ], [6,8,9])}
+    <p>La mejor época fue la 37 de 50: las 13 restantes no aportaron.</p>`,
+    chips:['6107f4e training results']},
+    {tag:'mirar', h:'Lo que haría distinto', body:`${caveat('Tres límites que hay que decir en voz alta', `<p><strong>1. Street light con 0.044 no es una métrica:</strong> con 7 imágenes de validación el número es ruido.</p><p><strong>2. Nunca evalué con vídeo de las gafas.</strong> La validación mezcla COCO y Open Images, no el dominio real donde se usa el modelo.</p><p><strong>3. El paso de combinar datasets no está en un script.</strong> Descargar, copiar, añadir prefijos y remapear se hizo a mano siguiendo la guía. Hoy no podría regenerar <code>nav_combined</code> con un solo comando.</p>`)}
+    <ul>
+      <li><strong>Hipótesis sobre Truck, no verificada: etiquetas ausentes.</strong> Las imágenes de Open Images solo tienen etiquetadas mis 6 clases. Si en una aparece un camión, entra como fondo y el modelo aprende a no detectarlo. Lo mismo con puertas sin etiquetar en fotos de COCO.</li>
+      <li><strong>Siguientes pasos:</strong> script reproducible para el dataset, más datos para Stairs y Street light, <code>patience=10</code> con 100 épocas, probar <code>yolo26m</code> y un conjunto de test con vídeo real.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'¿Por qué no congelar el backbone y entrenar solo una cabeza nueva con las 6 clases?', a:`<p>Porque la cabeza nueva tendría 6 salidas y el modelo dejaría de detectar personas y coches, que también hacen falta. <code>freeze</code> conserva las features aprendidas, no las clases. Para un único modelo con 24 clases hay que entrenar con las 24 a la vez. La alternativa sería dos modelos en paralelo, a costa de duplicar la latencia y la memoria.</p>`},
+    {q:'Street light tiene mAP50 de 0.044. ¿El modelo es malo detectando farolas?', a:`<p>No lo sé, y ese es el punto. Con 7 imágenes de validación, acertar o fallar dos cambia el número por completo. Antes de concluir nada necesito cientos de ejemplos de validación. Saber cuándo una métrica no es fiable importa tanto como el número.</p>`},
+    {q:'Mezclas imágenes donde solo están etiquetadas algunas clases. ¿Qué problema tiene?', a:`<p>Etiquetas ausentes: un objeto real sin caja se trata como fondo, y el modelo aprende a suprimirlo. Una foto de Open Images con un camión sin etiquetar penaliza detectar camiones. Creo que explica parte de la caída de Truck, pero no lo he medido. Se mitiga pseudo-etiquetando las clases de COCO en las imágenes propias con el modelo base, revisándolas, o filtrando imágenes con objetos sin etiquetar.</p>`}
+  ]
+},
+
+/* ───────────────────────── 5 · VELOCIDAD ───────────────────────── */
+{
+  id: 'velocidad', label: 'Medir velocidad sin engañarse', date: '20–21 feb 2026 · 6de1edd, 6107f4e',
+  focus: ['exportar','verificar'],
+  title: 'TensorRT FP16, y cómo se mide para que el número signifique algo',
+  sub: 'El modelo corre junto a otros (profundidad, mirada) en la misma GPU, así que cada milisegundo cuenta. Exportar a TensorRT es fácil. Medir bien es la parte donde es fácil equivocarse.',
+  beats: [
+    {tag:'entender', h:'Presupuesto de latencia, no FPS de folleto', body:`<p>En AriaGuard el detector comparte GPU con otros modelos. Importa cuántos milisegundos consume por frame y lo estable que es, más que el pico de FPS. TensorRT compila el modelo para una GPU concreta: fusiona capas, elige kernels y usa FP16.</p>`},
+    {tag:'simular', h:'Una iteración de benchmark, con y sin sincronizar', body:`${fig(`
+      <text class="s-d" x="16" y="22">sin torch.cuda.synchronize()</text>
+      <rect class="s-box" x="16" y="30" width="60" height="22" rx="3"/><text class="s-d" x="46" y="45" text-anchor="middle">CPU</text>
+      <rect class="s-box-bad" x="80" y="58" width="300" height="22" rx="3"/><text class="s-bad" x="230" y="73" text-anchor="middle">GPU trabajando…</text>
+      <line x1="16" y1="90" x2="80" y2="90" style="stroke:var(--danger)" stroke-width="2"/><text class="s-bad" x="90" y="94">reloj parado aquí → "0.4 ms" = falso</text>
+      <text class="s-d" x="16" y="128">con synchronize()</text>
+      <rect class="s-box" x="16" y="136" width="60" height="22" rx="3"/><text class="s-d" x="46" y="151" text-anchor="middle">CPU</text>
+      <rect class="s-box-ok" x="80" y="164" width="300" height="22" rx="3"/><text class="s-ok" x="230" y="179" text-anchor="middle">GPU trabajando…</text>
+      <line x1="16" y1="196" x2="380" y2="196" style="stroke:var(--ok)" stroke-width="2"/><text class="s-ok" x="390" y="200">reloj parado cuando la GPU termina → real</text>
+    `, '0 0 700 214', 'Ilustrativo. Las llamadas a la GPU son asíncronas: Python vuelve en cuanto el trabajo está encolado. Sin sincronizar, el cronómetro mide lo que tarda en encolarse, no la inferencia.', 'Línea de tiempo CPU y GPU con y sin sincronización')}
+    <p>El <strong>warmup</strong> resuelve el problema contrario. Las primeras llamadas incluyen cargar el engine, reservar memoria y ajustar kernels, y pueden tardar cientos de ms. Si entran en la media, la inflan.</p>`},
+    {tag:'escribir', h:'El bucle de medida', body:`${code('scripts/benchmark.py','benchmark_model', [
+      'dummy_img = np.random.randint(<span class="num">0</span>, <span class="num">255</span>, (imgsz, imgsz, <span class="num">3</span>), dtype=np.uint8)',
+      '',
+      '<span class="kw">for</span> _ <span class="kw">in</span> range(warmup):                 <span class="c1"># se ejecutan y se descartan</span>',
+      '    model(dummy_img, verbose=<span class="kw">False</span>)',
+      'torch.cuda.synchronize()',
+      '',
+      '<span class="kw">for</span> _ <span class="kw">in</span> range(iterations):',
+      '    start = time.perf_counter()',
+      '    model(dummy_img, verbose=<span class="kw">False</span>)',
+      '    torch.cuda.synchronize()               <span class="c1"># esperar a la GPU antes de parar el reloj</span>',
+      '    times.append(time.perf_counter() - start)',
+      '',
+      '<span class="kw">return</span> {<span class="str">"mean"</span>: ..., <span class="str">"std"</span>: ..., <span class="str">"median"</span>: ..., <span class="str">"fps"</span>: <span class="num">1000</span> / np.mean(times_ms)}'
+    ].join('\n'))}
+    <p>Export: <code>uv run python scripts/export_tensorrt.py --format engine --half</code>.</p>`},
+    {tag:'medir', h:'YOLO26m en RTX 5060 Ti (200 iteraciones, 20 de warmup)', body:`${table(['Formato','Media','Std','FPS','vs PyTorch'],[
+      ['PyTorch','8.86 ms','0.19 ms','112.9','1.0×'],
+      ['ONNX (CPU, no válido)','177.06 ms','10.55 ms','5.6','—'],
+      ['TensorRT FP16','3.02 ms','0.03 ms','331.3','2.9×']
+    ], [1])}
+    ${stats([{num:'2.9×', lbl:'más rápido que PyTorch', good:true},{num:'110 → 52 W', lbl:'potencia en pico'},{num:'451', lbl:'FPS · YOLO26s FP16 (nav)'}])}
+    <p>En pico, TensorRT también consumió menos potencia: 52 W frente a 110 W, según <code>nvidia-smi dmon</code>.</p>`,
+    chips:['6de1edd benchmark guide','6107f4e 451 FPS yolo26s_nav']},
+    {tag:'mirar', h:'Qué no dice este benchmark', body:`${caveat('Límites del número', `<p><strong>Imagen de ruido aleatorio:</strong> no hay decodificación de cámara ni objetos reales, así que casi no hay detecciones. En un vídeo real el tiempo por frame será mayor.</p><p><strong>El 451 FPS no tiene procedimiento registrado.</strong> Aparece en las notas del proyecto, pero no hay comando, commit ni log que lo acompañe. El método documentado es el del 331 FPS (YOLO26m). Hoy no puedo reproducir exactamente ese 451.</p><p><strong>La fila ONNX es inválida:</strong> corrió en CPU porque faltaba <code>onnxruntime-gpu</code>. Compararla con las de GPU no tiene sentido.</p>`)}
+    <ul>
+      <li><strong>Solo media y std.</strong> Para un sistema de seguridad importa la cola: añadiría p95 y p99. AriaGuard lo hizo después.</li>
+      <li><strong>No medí la precisión del engine FP16</strong> frente al <code>.pt</code>. FP16 suele perder muy poco, pero "suele" no es un dato. Correría <code>yolo val</code> con los dos.</li>
+      <li><strong>GPU de escritorio</strong>, no el Jetson de destino.</li>
+      <li><strong>Regla que me llevo:</strong> cada número va con su comando, su commit y su hardware.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'¿Por qué llamas a torch.cuda.synchronize() dentro del bucle?', a:`<p>Porque las operaciones de GPU son asíncronas respecto a la CPU. Sin sincronizar, <code>perf_counter()</code> se para cuando el trabajo está encolado, no terminado, y mides tiempos irrealmente bajos. Sincronizar antes de parar el reloj asegura medir la inferencia completa.</p>`},
+    {q:'¿Para qué sirve el warmup?', a:`<p>Las primeras inferencias incluyen costes únicos: cargar el engine, reservar memoria y ajustar kernels. Pueden tardar cientos de ms frente a ~3 ms en régimen estable. Si entran en la media la inflan, y como FPS = 1000/media, el error se propaga. Se ejecutan y se descartan.</p>`},
+    {q:'¿TensorRT FP16 pierde precisión? ¿Lo mediste?', a:`<p>Puede perder un poco por redondeo en capas sensibles. En este repo no hay registro de haber comparado el mAP del <code>.engine</code> con el del <code>.pt</code>, así que no puedo afirmar nada. Es lo primero que haría antes de desplegar: <code>yolo val</code> con ambos sobre el mismo conjunto.</p>`}
+  ]
+},
+
+/* ───────────────────────── 6 · METODOLOGÍA ───────────────────────── */
+{
+  id: 'metodologia', label: 'Construir, verificar, desplegar', date: 'dic 2025 → jul 2026 · 5f0e9d4, 7c671ca',
+  focus: ['verificar','usar','framework'],
+  title: 'Qué significa "funciona" en un repo de ML',
+  sub: 'Que el código no falle, que los datos sean válidos, que el modelo cumpla y que corra donde se usa son cuatro cosas distintas. Esta fase cuenta qué se verifica hoy y qué no.',
+  beats: [
+    {tag:'entender', h:'Cuatro preguntas distintas', body:`${table(['Pregunta','Cómo se responde aquí','Estado'],[
+      ['¿El código hace lo que dice?','pytest unitario (anotar, split, visualizar)','sí'],
+      ['¿Los datos son válidos?','tests de integridad del dataset','sí, en local'],
+      ['¿El modelo es bueno?','evaluate.py + results.csv','manual'],
+      ['¿Corre donde se usa?','export TensorRT + benchmark','manual, sin CI']
+    ])}`},
+    {tag:'simular', h:'Un clon limpio, antes y después del fix', body:`${fig(`
+      <text class="s-d" x="16" y="22">antes · uv sync --extra dev && pytest</text>
+      <rect class="s-box" x="16" y="30" width="170" height="40" rx="6"/><text class="s-t" x="101" y="55" text-anchor="middle">recolectar tests</text>
+      <line class="s-line" x1="186" y1="50" x2="222" y2="50" marker-end="url(#arrow)"/>
+      <rect class="s-box-bad" x="226" y="30" width="270" height="40" rx="6"/><text class="s-bad" x="361" y="55" text-anchor="middle">import transformers → ERROR</text>
+      <line class="s-line" x1="496" y1="50" x2="532" y2="50" marker-end="url(#arrow)"/>
+      <rect class="s-box-bad" x="536" y="30" width="300" height="40" rx="6"/><text class="s-bad" x="686" y="55" text-anchor="middle">run abortado · 45 tests ocultos</text>
+      <text class="s-d" x="16" y="104">después · 7c671ca</text>
+      <rect class="s-box" x="16" y="112" width="170" height="40" rx="6"/><text class="s-t" x="101" y="137" text-anchor="middle">dev incluye annotation</text>
+      <line class="s-line" x1="186" y1="132" x2="222" y2="132" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="226" y="112" width="270" height="40" rx="6"/><text class="s-t" x="361" y="137" text-anchor="middle">sin data/ → skip · incompleto → fail</text>
+      <line class="s-line" x1="496" y1="132" x2="532" y2="132" marker-end="url(#arrow)"/>
+      <rect class="s-box-ok" x="536" y="112" width="300" height="40" rx="6"/><text class="s-ok" x="686" y="137" text-anchor="middle">45 passed · 9 skipped</text>
+    `, '0 0 850 166', 'Un solo error al recolectar tests aborta toda la ejecución, y un repo sano parece roto. El fix hace que el extra dev instale lo que importan los tests y que los tests de datos se salten si no hay dataset.', 'Flujo de pytest antes y después del fix')}`},
+    {tag:'escribir', h:'El ciclo completo, con sus puertas', body:`${fig(`
+      ${[['Construir','uv · config.yaml','s-box'],['Verificar','pytest','s-box-ok'],['Entrenar','train.py','s-box'],['Evaluar','mAP por clase','s-box'],['Exportar','TensorRT','s-box'],['Desplegar','AriaGuard','s-box']].map(([t,d,c],i)=>{
+        const x = 16 + i*146;
+        return `<rect class="${c}" x="${x}" y="24" width="126" height="54" rx="7"/>
+        <text class="s-t" x="${x+63}" y="47" text-anchor="middle">${t}</text><text class="s-d" x="${x+63}" y="65" text-anchor="middle">${d}</text>
+        ${i<5?`<line class="s-line" x1="${x+126}" y1="51" x2="${x+143}" y2="51" marker-end="url(#arrow)"/>`:''}`;}).join('')}
+      <text class="s-bad" x="162" y="100" text-anchor="middle">puerta: tests en verde</text>
+      <text class="s-bad" x="600" y="100" text-anchor="middle">puerta: mAP ≥ anterior (manual)</text>
+      <text class="s-d" x="455" y="124" text-anchor="middle">entregable: models/yolo26s_nav.pt en git → cada máquina compila su .engine</text>
+    `, '0 0 900 136', 'La metodología real. Solo la primera puerta es automática en local, y ninguna corre en CI.', 'Ciclo construir, verificar, entrenar, evaluar, exportar, desplegar')}
+    ${code('tests/test_data_integrity.py','skip si falta · fallar si está incompleto', [
+      '<span class="kw">def</span> <span class="fn">test_train_structure</span>(<span class="kw">self</span>, data_dir):',
+      '    dataset_dir = data_dir / <span class="str">"dataset"</span>',
+      '    <span class="kw">if not</span> dataset_dir.exists():',
+      '        pytest.skip(<span class="str">"data/dataset/ not found (gitignored local artifact)"</span>)',
+      '    <span class="c1"># si existe, se exige la estructura completa</span>'
+    ].join('\n'))}
+    <p><strong>Decisión:</strong> versionar <code>yolo26s_nav.pt</code> (20 MB) en git porque es el único artefacto que no se puede regenerar sin reentrenar. El <code>.engine</code> no se versiona: depende de la GPU y de la versión de TensorRT.</p>`,
+    chips:['5f0e9d4 test suite (47 tests)','7c671ca unblock collection','8883995 track model']},
+    {tag:'medir', h:'Qué cubren los tests', body:`${table(['Archivo','Qué comprueba'],[
+      ['test_auto_annotate.py','NMS, formato YOLO, template matching'],
+      ['test_split_dataset.py','parejas imagen/label, proporciones'],
+      ['test_visualize.py','carga de anotaciones, conversión a píxeles'],
+      ['test_grounding_dino.py','anotador zero-shot'],
+      ['test_data_integrity.py','estructura, formato y rangos de coordenadas'],
+      ['test_integration.py','configs, modelos, script de inferencia']
+    ])}
+    ${stats([{num:'45', lbl:'passed', good:true},{num:'9', lbl:'skipped (sin data/)'},{num:'0', lbl:'jobs de CI'}])}`},
+    {tag:'mirar', h:'Huecos de ingeniería', body:`${caveat('Lo que falta para llamarlo robusto', `<p><strong>Sin CI:</strong> quité el pipeline de GitHub Actions en agosto de 2026, así que hoy nada impide mergear con tests en rojo.</p><p><strong>Los tests de datos nunca corren fuera de mi máquina.</strong> Un test que siempre se salta en CI no protege. Falta un mini-dataset de ejemplo en <code>tests/fixtures</code>.</p><p><strong>Sin regresión de modelo:</strong> nada comprueba que un reentrenamiento no empeore el mAP.</p>`)}
+    <ul>
+      <li><strong>Sin demo desplegada:</strong> <code>app.py</code> ya es Gradio. Un Hugging Face Space en CPU con imágenes sería viable.</li>
+      <li><strong>Modelo en git</strong> en vez de Hugging Face Hub o una Release con model card. Es aceptable para uno, pero no escala.</li>
+      <li><strong>Sin Docker ni archivo LICENSE</strong>, aunque <code>pyproject</code> declara MIT.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'¿Por qué versionas el .pt en git y no el .engine?', a:`<p>El <code>.pt</code> es el resultado de horas de entrenamiento y no se regenera sin repetirlo. El <code>.engine</code> es una compilación específica de una GPU y una versión de TensorRT: un engine de mi RTX no sirve en un Jetson. Se versiona la fuente portable y cada destino compila la suya. A más escala usaría Hugging Face Hub o Releases con versión y model card.</p>`},
+    {q:'Un test que se salta cuando falta data/, ¿no es un test que nunca falla?', a:`<p>En CI, sí, y es su debilidad. En local tiene valor: se salta si no hay dataset, pero falla si hay uno incompleto, y lo verifiqué creando uno parcial. La solución completa es un dataset diminuto en <code>tests/fixtures</code> para que la lógica de validación corra siempre.</p>`},
+    {q:'¿Qué añadirías primero para que esto sea "producción"?', a:`<p>En orden: CI con pytest en CPU, un fixture de datos pequeño, un script reproducible para construir el dataset y una evaluación de regresión que compare mAP por clase contra el modelo anterior antes de publicar uno nuevo. Después, la demo y el model card.</p>`}
+  ]
+},
+
+/* ───────────────────────── 7 · MIRAR ATRÁS ───────────────────────── */
+{
+  id: 'mirar-atras', label: 'Mirar atrás: qué cambiaría', date: 'sep 2026', focus: 'all',
+  title: 'Lo que convierte "lo resolví" en "aprendí algo"',
+  sub: 'El último paso del método, aplicado al proyecto entero.',
+  intro: `
+  ${fig(`
+    ${[['1','Split sin fuga','por vídeo o escena','s-box-bad'],['2','Script del dataset','nav_combined reproducible','s-box-bad'],['3','Test con vídeo real','de las gafas','s-box-bad'],['4','CI + fixtures','pytest en cada push','s-box'],['5','Demo + model card','HF Space / Hub','s-box']].map(([n,t,d,c],i)=>{
+      const x = 16 + i*178;
+      return `<rect class="${c}" x="${x}" y="20" width="160" height="70" rx="7"/>
+      <text class="s-d" x="${x+12}" y="38">${n}</text>
+      <text class="s-t" x="${x+80}" y="58" text-anchor="middle">${t}</text>
+      <text class="s-d" x="${x+80}" y="76" text-anchor="middle">${d}</text>`;}).join('')}
+    <text class="s-bad" x="270" y="112" text-anchor="middle">afectan a si los números son ciertos</text>
+    <text class="s-d" x="712" y="112" text-anchor="middle">afectan a la madurez</text>
+  `, '0 0 910 124', 'Prioridades si empezara hoy. Las tres primeras van antes porque sin ellas las métricas de esta página no son del todo fiables.', 'Cinco prioridades ordenadas')}
+  <div class="pitch">
+    <span class="lbl">Qué aprendí</span>
+    <p><strong>1. Las etiquetas son el proyecto.</strong> Entrenar es un comando; conseguir, remapear y validar etiquetas es donde se va el tiempo y donde se esconden los errores silenciosos.</p>
+    <p><strong>2. Un número sin procedimiento no vale.</strong> El 98.7% tenía fuga, el "43× mejor" contaba cajas y el 451 FPS no se puede reproducir. Ahora cada métrica va con su comando, su commit y su hardware.</p>
+    <p><strong>3. La media esconde lo que importa.</strong> Los pilares invertidos, Stairs y el p95: el caso crítico hay que medirlo por separado.</p>
+    <p><strong>4. Los errores silenciosos son los caros.</strong> Un <code>except</code> amplio, un ID mal remapeado o un split aleatorio no fallan: dan un resultado equivocado que parece correcto.</p>
+  </div>`,
+  beats: [],
+  qa: [
+    {q:'Si empezaras de cero, ¿qué harías distinto desde el primer día?', a:`<p>Diseñar la evaluación antes que el modelo: un split sin fuga, un conjunto de test del dominio real (vídeo de las gafas) y métricas por clase para las que importan al producto. En este proyecto la evaluación llegó después y por eso algunos números son optimistas.</p>`},
+    {q:'¿Qué harías con una semana más?', a:`<p>Día 1–2: script reproducible de <code>nav_combined</code> y split corregido. Día 3: grabar y etiquetar un test de vídeo real. Día 4: reentrenar con <code>patience</code> y comparar YOLO26s con YOLO26m en ese test. Día 5: CI, fixture de datos y model card. No añadiría ninguna funcionalidad nueva hasta tener los números bien medidos.</p>`},
+    {q:'¿De qué estás más orgulloso, y cuál fue tu mayor error?', a:`<p>Orgulloso de la estrategia del dataset combinado y del flujo de anotación con revisión humana, que resuelven el problema real de conseguir datos. Mi mayor error fue dar por bueno un 98.7% con un split que filtraba frames. Es un error clásico; lo detecté al revisar el proyecto y por eso está explicado en la primera fase, no escondido.</p>`}
+  ]
+}
+];
+
+PAGE.steps.en = [
+/* 0 · SUMMARY */
+{
+  id: 'resumen', label: 'The project in 2 minutes', date: 'Dec 2025 → Sep 2026', focus: 'all',
+  title: 'A 24-class obstacle detector, and the framework to train it',
+  sub: 'This page walks through how the project was built, phase by phase, with the real code and metrics, including the ones that went wrong. Use it to understand the project, to relearn it and to explain it in an interview.',
+  intro: `
+  <div class="pitch">
+    <span class="lbl">Pitch</span>
+    <p><strong>Problem.</strong> A blind pedestrian wearing camera glasses needs the system to detect doors, stairs, street lights or wheelchairs. Models pretrained on COCO don't know those classes.</p>
+    <p><strong>What I built.</strong> A Python framework that covers the whole loop: auto-annotate images from text (Grounding DINO), train YOLO26, evaluate, export to TensorRT and benchmark. With it I trained <code>yolo26s_nav</code>, a 24-class model used by AriaGuard.</p>
+    <p><strong>Honest result.</strong> It's fast (451 FPS with TensorRT FP16), but accuracy is modest: 0.47 mAP50. The classes that matter most for the product, like stairs, are among the weakest. I built it alone: 133 commits between December 2025 and September 2026.</p>
+  </div>
+  ${stats([
+    {num:'0.470', lbl:'mAP50 · 24 classes'},
+    {num:'0.311', lbl:'mAP50-95'},
+    {num:'451', lbl:'FPS · TensorRT FP16', good:true},
+    {num:'14K', lbl:'training images'}
+  ])}
+  ${explain('How to read this page: the 5-step method', `<p>Every phase uses the same method, adapted from Pólya's <em>How to Solve It</em> (1945):</p>`)}
+  ${fig(`
+    ${[['1 · Understand','what the problem is'],['2 · Simulate','one case, real numbers'],['3 · Write','code and decision'],['4 · Measure','what happened, how'],['5 · Look back','what I would change']].map(([t,d],i)=>{
+      const x = 16 + i*186;
+      return `<rect class="s-box" x="${x}" y="20" width="160" height="56" rx="7"/>
+      <text class="s-t" x="${x+80}" y="44" text-anchor="middle">${t}</text>
+      <text class="s-d" x="${x+80}" y="62" text-anchor="middle">${d}</text>
+      ${i<4?`<line class="s-line" x1="${x+160}" y1="48" x2="${x+183}" y2="48" marker-end="url(#arrow)"/>`:''}`;}).join('')}
+    <path class="s-line" d="M 840 76 C 840 118, 96 118, 96 80" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+    <text class="s-d" x="468" y="112" text-anchor="middle">what you learn feeds the next round</text>
+  `, '0 0 950 126', 'Pólya had four steps. "Devise a plan" becomes simulating one concrete case, and "look back" splits into measure and look back, because code can be run and can prove you wrong.', 'Five-step flow: understand, simulate, write, measure, look back, looping back')}
+  `,
+  beats: [],
+  qa: [
+    {q:'Walk me through this project in two minutes.', a:`<p>In the order of the 5 steps. <strong>Understand:</strong> an assisted-navigation system needed classes COCO doesn't have, like doors or stairs. <strong>Simulate and write:</strong> you can't add classes to YOLO without it forgetting the original ones, so I combined a COCO subset with Open Images data, remapping class IDs, and built a framework to annotate, train and export. <strong>Measure:</strong> 451 FPS with TensorRT FP16, but 0.47 mAP50, with weak classes exactly where it matters. <strong>Look back:</strong> the dataset merge isn't scripted, I never evaluated on real footage from the glasses, and the first version's validation was leaky. That's what I'd fix first.</p>`},
+    {q:'What exactly was your role?', a:`<p>Everything: framing the problem, data, code, training runs and benchmarks. I'm the only author of the 133 commits. I used AI assistants for support, but the decisions and the validation of results are mine. That's why I can explain every number on this page, and its limits.</p>`}
+  ]
+},
+
+/* 1 · VR ORIGIN */
+{
+  id: 'origen', label: 'The origin: a VR detector', date: 'Dec 3–8, 2025 · d319f58 → ae29ec0',
+  focus: ['datos','anotar','dataset','entrenar','evaluar'],
+  title: 'First, a single object in a virtual world',
+  sub: 'Before it was a framework, the project detected one object: pillars with a yellow-and-black checkerboard pattern inside an Unreal Engine scene. Almost every later problem showed up here first.',
+  beats: [
+    {tag:'entender', h:'One video, zero labels', body:`<p>The starting point was a video captured in VR and a cropped image of the pillar. Labeling hundreds of frames by hand was slow, and the classic tool, LabelImg, crashed on Python 3.12 (<code>drawLine(): argument 1 has unexpected type 'float'</code>).</p>
+    <p>The real question wasn't how to train YOLO, but <strong>how to get labels without labeling by hand</strong>.</p>`},
+    {tag:'simular', h:'Template matching on one frame', body:`<p>The idea: slide the pillar image (the template) across the frame and score how similar each position is. Where the score passes a threshold, you have a detection.</p>
+    ${fig(`
+      <rect class="s-box" x="20" y="20" width="250" height="140" rx="6"/>
+      <text class="s-d" x="30" y="38">frame 1280×720</text>
+      <rect x="70" y="60" width="44" height="80" rx="3" fill="none" style="stroke:var(--accent)" stroke-width="2"/>
+      <rect x="180" y="60" width="44" height="80" rx="3" fill="none" style="stroke:var(--danger)" stroke-width="2" stroke-dasharray="4 3"/>
+      <text class="s-ok" x="92" y="154" text-anchor="middle">0.93</text>
+      <text class="s-bad" x="202" y="154" text-anchor="middle">0.74</text>
+      <line class="s-line" x1="270" y1="90" x2="320" y2="90" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="325" y="30" width="250" height="44" rx="6"/>
+      <text class="s-t" x="450" y="57" text-anchor="middle">threshold 0.70 → 2 hits</text>
+      <rect class="s-box-ok" x="325" y="96" width="250" height="44" rx="6"/>
+      <text class="s-t" x="450" y="123" text-anchor="middle">threshold 0.85 → 1 hit</text>
+      <text class="s-bad" x="450" y="170" text-anchor="middle">repeating checkerboard → false positives</text>
+    `, '0 0 600 180', 'Illustrative simulation with example values: the checkerboard repeats in places that aren\'t the pillar. At 0.70 those pass the filter; raising it to 0.85–0.95 removes them, at the cost of missing pillars seen at odd angles.', 'Template sliding over a frame with two scores and two thresholds')}
+    <p>The same reasoning explains the next failure: an <strong>inverted</strong> pillar, black on top, barely resembles the normal template and never passes the threshold. It needed a second template.</p>`},
+    {tag:'escribir', h:'One script per step, with a human reviewing', body:`<p>Each step is its own script. Human review (<code>review_annotations.py</code>) sits in the middle on purpose: auto-annotation proposes, a person decides.</p>
+    ${fig(`
+      ${pipelineSvg([['auto_annotate','template + NMS'],['visualize','inspect boxes'],['review','human accepts'],['split_dataset','80/20 seed 42'],['train · eval','YOLOv12s']])}
+      <path class="s-line" d="M 694 86 C 694 130, 104 130, 104 90" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+      <text class="s-bad" x="400" y="126" text-anchor="middle">inverted pillars missed → new template → re-annotate</text>
+    `, '0 0 1000 140', 'The first version\'s flow. The return arrow is the real loop I had to go through when the model missed inverted pillars.', 'Five-script pipeline with a feedback loop')}
+    ${code('scripts/split_dataset.py','train/val split', [
+      '<span class="kw">def</span> <span class="fn">split_pairs</span>(pairs, train_ratio=<span class="num">0.8</span>, seed=<span class="num">42</span>):',
+      '    random.seed(seed)',
+      '    shuffled = pairs.copy()',
+      '    random.shuffle(shuffled)          <span class="c1"># ← frames from ONE video, shuffled</span>',
+      '    split_idx = int(len(shuffled) * train_ratio)',
+      '    <span class="kw">return</span> shuffled[:split_idx], shuffled[split_idx:]'
+    ].join('\n'))}`,
+    chips:['0ec9c97 auto-annotate template matching','f83a122 review_annotations','699d080 evaluate, export, benchmark']},
+    {tag:'medir', h:'Four training runs', body:`${table(['#','Model','Data','mAP50-95','Note'],[
+      ['1','YOLOv8n · 10 ep.','555 train','62.7%','baseline'],
+      ['2','YOLOv12s · 50 ep.','555 train','84.7%','+22 points from a bigger model'],
+      ['3','YOLOv12s · 100 ep.','+7 inverted','87.4%','not enough'],
+      ['4','YOLOv12s · 100 ep.','+59 inverted','87.4%','final']
+    ])}
+    ${stats([{num:'98.7%', lbl:'final mAP50'},{num:'99.2%', lbl:'recall'},{num:'71 → 180', lbl:'FPS PyTorch → TensorRT', good:true},{num:'RTX 2060', lbl:'6 GB'}])}
+    <p>The model produced "ghost" detections at 0.50–0.55 confidence, so I raised the inference threshold from 0.25 to 0.65.</p>`,
+    chips:['9d30375 TensorRT 180 FPS']},
+    {tag:'mirar', h:'That 98.7% is optimistic', body:`${caveat('Train/val leakage', `<p>Every frame comes from the same video and <code>split_pairs</code> shuffles them randomly. Consecutive frames are nearly identical, so the model was very likely validated on images it had practically seen in training. The 98.7% measures memory of that video, not generalization.</p><p><strong>What I'd do today:</strong> split by time blocks or scenes, never frame by frame.</p>`)}
+    <ul>
+      <li><strong>Adding 59 inverted frames didn't move mAP50-95</strong> (87.4% → 87.4%). Either validation had almost no inverted pillars, or the aggregate metric hid the case that mattered. I didn't check; I should have measured that subset on its own.</li>
+      <li><strong>Raising the threshold to 0.65 is a patch</strong>: it removes ghosts, and also real detections. The real fix is adding hard negative examples.</li>
+      <li><strong>What worked:</strong> auto-annotation plus human review. That idea survives through the whole project.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'Your first model has 98.7% mAP50. Do you believe it?', a:`<p>Not really. The frames come from one video and the split is random frame by frame, so validation contains frames nearly identical to training ones. That's leakage. The number says the model recognizes that video, not that it works on another. To trust it I'd split by time blocks and test on a different recording.</p>`},
+    {q:'You raised the confidence threshold from 0.25 to 0.65. What does that cost?', a:`<p>Fewer false positives for lower recall: real pillars scoring between 0.25 and 0.65 stop being detected. In a pedestrian safety system, missing a real obstacle is worse than an extra warning. The right move is to pick the threshold from the validation precision-recall curve and fix the cause with negative examples, not set it by eye.</p>`},
+    {q:'You added 59 inverted-pillar frames and mAP50-95 didn\'t change. How do you read that?', a:`<p>An aggregate metric can hide the subgroup you care about. If validation has few inverted pillars, improving on them barely moves the average. What was missing is evaluating that subset separately. I didn't, and it's one of the lessons I took away.</p>`}
+  ]
+},
+
+/* 2 · ZERO-SHOT */
+{
+  id: 'zeroshot', label: 'Annotating without annotating', date: 'Dec 15, 2025 · a6bf6ad, 6b5a4a7',
+  focus: ['anotar'],
+  title: 'Describe the object in text instead of cropping it',
+  sub: 'With template matching, every new look of the object needs another template, and that doesn\'t scale. So I tried models that detect from a sentence: YOLO-World failed and Grounding DINO worked.',
+  beats: [
+    {tag:'entender', h:'The bottleneck was labels, not the model', body:`<p>Training YOLO is one command. Getting thousands of correct boxes is weeks of work. If a <em>zero-shot</em> model (one that detects unseen classes guided by text) proposes the boxes and a person only reviews, the cost drops by an order of magnitude.</p>`},
+    {tag:'simular', h:'One image, end to end', body:`${fig(`
+      <rect class="s-box" x="16" y="20" width="170" height="44" rx="6"/><text class="s-t" x="101" y="47" text-anchor="middle">image 1280×720</text>
+      <rect class="s-box" x="16" y="80" width="170" height="44" rx="6"/><text class="s-t" x="101" y="100" text-anchor="middle">"yellow and black</text><text class="s-t" x="101" y="115" text-anchor="middle">checkered box."</text>
+      <line class="s-line" x1="186" y1="42" x2="226" y2="66" marker-end="url(#arrow)"/><line class="s-line" x1="186" y1="102" x2="226" y2="80" marker-end="url(#arrow)"/>
+      <rect class="s-box-ok" x="230" y="46" width="150" height="54" rx="6"/><text class="s-t" x="305" y="70" text-anchor="middle">Grounding DINO</text><text class="s-d" x="305" y="88" text-anchor="middle">tiny · transformers</text>
+      <line class="s-line" x1="380" y1="73" x2="415" y2="73" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="418" y="46" width="150" height="54" rx="6"/><text class="s-t" x="493" y="68" text-anchor="middle">boxes + scores</text><text class="s-d" x="493" y="86" text-anchor="middle">score ≥ 0.30</text>
+      <line class="s-line" x1="568" y1="73" x2="603" y2="73" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="606" y="46" width="260" height="54" rx="6"/><text class="s-t" x="736" y="68" text-anchor="middle">0 0.375 0.500 0.125 0.444</text><text class="s-d" x="736" y="86" text-anchor="middle">YOLO line: class cx cy w h</text>
+    `, '0 0 880 140', 'One image through the flow. The prompt ends with a period because Grounding DINO splits phrases on periods.', 'Image and text go into Grounding DINO, boxes come out, get filtered and converted to YOLO format')}
+    ${explain('The conversion by hand, with numbers', `<p>Pixel box <code>(x1, y1, x2, y2) = (400, 200, 560, 520)</code> in a 1280×720 image. YOLO wants center and size normalized to 0–1:</p>
+    <p><code>cx = (400+560)/2/1280 = 0.375</code> · <code>cy = (200+520)/2/720 = 0.500</code> · <code>w = 160/1280 = 0.125</code> · <code>h = 320/720 = 0.444</code></p>
+    <p>Normalize by width where height belongs and the boxes shift, yet training throws no error: it silently learns garbage. That's why <code>visualize_annotations.py</code> exists.</p>`)}`},
+    {tag:'escribir', h:'The core of the annotator', body:`${code('src/annotation.py','AutoAnnotator.annotate_image', [
+      '<span class="c1"># Grounding DINO splits phrases on periods</span>',
+      'prompt = prompt <span class="kw">if</span> prompt.endswith(<span class="str">"."</span>) <span class="kw">else</span> prompt + <span class="str">"."</span>',
+      '',
+      'inputs = <span class="kw">self</span>.processor(images=pil_image, text=prompt, return_tensors=<span class="str">"pt"</span>).to(<span class="kw">self</span>.device)',
+      '<span class="kw">with</span> torch.no_grad():',
+      '    outputs = <span class="kw">self</span>.model(**inputs)',
+      '',
+      'results = <span class="kw">self</span>.processor.post_process_grounded_object_detection(',
+      '    outputs, input_ids=inputs.input_ids, target_sizes=[(height, width)])[<span class="num">0</span>]',
+      '',
+      'mask = results[<span class="str">"scores"</span>] >= threshold      <span class="c1"># 0.3 by default</span>',
+      'boxes = results[<span class="str">"boxes"</span>][mask].cpu().numpy()'
+    ].join('\n'))}
+    <p><strong>Decision:</strong> load the model through Hugging Face <code>transformers</code> instead of building the original repo. Installing is trivial and the dependency stays an optional <em>extra</em> (<code>uv sync --extra annotation</code>).</p>`,
+    chips:['a6bf6ad YOLO-World','6b5a4a7 Grounding DINO']},
+    {tag:'medir', h:'Same images, two models', body:`${table(['Metric (47 images)','YOLO-World','Grounding DINO'],[
+      ['Images with any detection','8.5%','100%'],
+      ['Total detections','6','259'],
+      ['Confidence range','0.05–0.09','0.25–0.69'],
+      ['Speed','~25 img/s','~2 img/s']
+    ])}
+    <p>With YOLO-World, prompts like <code>"yellow black checkered cube"</code> or <code>"yellow box"</code> returned zero detections. My hypothesis, not verified: its language side (CLIP) was trained on real photos and struggles with synthetic VR textures.</p>`},
+    {tag:'mirar', h:'Detecting a lot is not detecting well', body:`${caveat('What the table does not say', `<p>"100% coverage" and "259 detections" measure <strong>quantity</strong>, not whether the boxes were right. That's 5.5 detections per image, and I never compared against a hand-labeled set, so I don't know how many were false. My diary said "43× better", which compares counts, not quality.</p>`)}
+    <ul>
+      <li><strong>What I'd do:</strong> hand-label about 50 images as a <em>gold set</em> and measure the annotator's precision and recall at several thresholds before trusting it.</li>
+      <li><strong>The speed trade-off was acceptable</strong>: 12× slower, but annotation is an offline job done once.</li>
+      <li><strong>The underlying risk:</strong> train on labels from another model and you inherit its systematic errors. Whatever the annotator misses, the detector learns to miss.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'How do you know the automatic annotations are good?', a:`<p>In this project, only by visual inspection and review with <code>review_annotations.py</code>. That isn't enough. The rigorous way is a hand-labeled <em>gold set</em>, measuring the annotator's precision and recall against it and choosing the threshold from that curve. It's the first thing I'd add.</p>`},
+    {q:'YOLO-World is 12× faster. Why not use it?', a:`<p>Because in this domain it detected almost nothing: 8.5% of images, with confidence below 0.1. Speed doesn't matter if the output is useless, and annotation runs offline anyway. For real-time inference the trade-off would be different.</p>`},
+    {q:'What\'s the risk of training a detector on labels produced by another model?', a:`<p>It copies that model's mistakes. If Grounding DINO misses small or backlit pillars, those cases become background and the detector learns to ignore them. You mitigate it with human review, a gold set to measure the annotator, and hand-adding the hard cases.</p>`}
+  ]
+},
+
+/* 3 · FRAMEWORK */
+{
+  id: 'framework', label: 'From script to framework', date: 'Jan 15 – Feb 20, 2026 · 02295c8, 53029a4, f03846c',
+  focus: ['framework'],
+  title: 'Separate the UI from the logic, and remove everything that said "pillar"',
+  sub: 'The project worked for one object and one GPU. Reusing it with any dataset meant breaking up a several-hundred-line app.py and removing what was hardcoded.',
+  beats: [
+    {tag:'entender', h:'Everything lived in app.py', body:`<p>The Gradio UI, training, inference and annotation were mixed in a single file. The refactor moved 839 lines into modules. On top of that, paths, class names ("pillar") and GPU parameters were hardcoded.</p>
+    <p>Result: testing a function meant launching the UI, and changing GPU or dataset meant editing code.</p>`},
+    {tag:'simular', h:'The same call on three machines', body:`<p><code>suggest_training_defaults()</code> picks parameters from the detected VRAM:</p>
+    ${table(['Machine','VRAM','batch','workers','cache','amp'],[
+      ['RTX 5060 Ti','16 GB','-1 (auto)','8','ram','yes'],
+      ['RTX 2060','6 GB','8','4','disk','yes'],
+      ['Laptop, no GPU','—','4','4','no','no']
+    ])}
+    <p><code>batch=-1</code> enables Ultralytics AutoBatch, which estimates how many images fit in a fraction of VRAM. The same <code>config.yaml</code> works on different machines.</p>`},
+    {tag:'escribir', h:'Three layers', body:`${fig(`
+      <rect class="s-box" x="60" y="16" width="260" height="50" rx="7"/><text class="s-t" x="190" y="38" text-anchor="middle">app.py · Gradio</text><text class="s-d" x="190" y="55" text-anchor="middle">7 tabs, no logic</text>
+      <rect class="s-box" x="480" y="16" width="260" height="50" rx="7"/><text class="s-t" x="610" y="38" text-anchor="middle">scripts/ · CLI</text><text class="s-d" x="610" y="55" text-anchor="middle">train, inference, export…</text>
+      <line class="s-line" x1="190" y1="66" x2="330" y2="104" marker-end="url(#arrow)"/><line class="s-line" x1="610" y1="66" x2="470" y2="104" marker-end="url(#arrow)"/>
+      <rect class="s-box-ok" x="40" y="108" width="720" height="62" rx="7"/>
+      <text class="s-t" x="400" y="130" text-anchor="middle">src/ · the logic, importable and testable</text>
+      <text class="s-d" x="400" y="152" text-anchor="middle">hardware · project · training · inference · dataset · annotation · benchmark</text>
+      <line class="s-line" x1="400" y1="170" x2="400" y2="196" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="200" y="200" width="400" height="40" rx="7"/><text class="s-t" x="400" y="225" text-anchor="middle">Ultralytics · PyTorch · transformers</text>
+    `, '0 0 800 250', 'The web UI and the CLI are two doors into the same logic. A REST API tomorrow would be a third door without touching src/.', 'Three-layer architecture')}
+    ${code('src/hardware.py','suggest_training_defaults', [
+      'vram = gpu.vram_gb',
+      '<span class="kw">if</span> vram >= <span class="num">16</span>:',
+      '    <span class="kw">return</span> {<span class="str">"batch"</span>: -<span class="num">1</span>, <span class="str">"workers"</span>: <span class="num">8</span>, <span class="str">"cache"</span>: <span class="str">"ram"</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}',
+      '<span class="kw">elif</span> vram >= <span class="num">8</span>:',
+      '    <span class="kw">return</span> {<span class="str">"batch"</span>: -<span class="num">1</span>, <span class="str">"workers"</span>: <span class="num">8</span>, <span class="str">"cache"</span>: <span class="str">"ram"</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}  <span class="c1"># ← identical to the branch above</span>',
+      '<span class="kw">elif</span> vram >= <span class="num">4</span>:',
+      '    <span class="kw">return</span> {<span class="str">"batch"</span>: <span class="num">8</span>, <span class="str">"workers"</span>: <span class="num">4</span>, <span class="str">"cache"</span>: <span class="kw">True</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}'
+    ].join('\n'))}
+    <p>I also moved from <code>pip</code> to <code>uv</code>, with <code>pyproject.toml</code> and optional extras, so heavy dependencies (transformers, FiftyOne) only install when used.</p>`,
+    chips:['02295c8 split app.py into src/','53029a4 remove VR hardcoding','f03846c migrate to uv']},
+    {tag:'medir', h:'A bug the UI couldn\'t show', body:`<p>After a PyTorch update, the UI always showed "GPU: Not available" on a machine with a GPU. The memory attribute the code read didn't exist in that version. The <code>except Exception</code> swallowed the <code>AttributeError</code> and quietly returned "no GPU".</p>
+    ${code('src/hardware.py','fix 0c5018d', [
+      '<span class="c1">- vram_mb = torch.cuda.get_device_properties(0).total_mem // (1024 * 1024)</span>',
+      '<span class="str">+ props = torch.cuda.get_device_properties(0)</span>',
+      '<span class="str">+ total_bytes = getattr(props, "total_memory", None) or getattr(props, "total_mem", 0)</span>',
+      '<span class="str">+ vram_mb = total_bytes // (1024 * 1024)</span>'
+    ].join('\n'))}`,
+    chips:['0c5018d GPU detection fix']},
+    {tag:'mirar', h:'The fix treated the symptom', body:`${caveat('Still there', `<p>The <code>except Exception</code> that hid the bug <strong>is still in the code</strong>. Next time something breaks inside <code>detect_gpu()</code>, the same thing will happen. At minimum it should log the exception. Better, catch only the errors you expect.</p>`)}
+    <ul>
+      <li><strong>The 16 GB and 8 GB branches are identical.</strong> Either the distinction is unnecessary or it's missing different parameters, like <code>imgsz</code>. It's code that looks like a decision it doesn't make.</li>
+      <li><strong>To verify:</strong> <code>pyproject.toml</code> declares commands (<code>fts-train</code>…) but has no <code>[build-system]</code>, so they're probably never installed. The README uses <code>uv run python scripts/…</code>, which does work.</li>
+      <li><strong>What went well:</strong> the <code>src/</code> split is what made unit tests possible without launching Gradio.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'Why separate src/ from app.py and scripts/?', a:`<p>To have a single implementation of each thing and be able to test it. Before, training from the UI and from the CLI were two paths that could diverge. Now both call <code>src/</code>. And <code>src/</code> imports without loading Gradio, which makes tests fast and CI-friendly.</p>`},
+    {q:'Your detect_gpu() has an except Exception. What\'s wrong with that?', a:`<p>It turns any error into a valid-looking result ("no GPU"). It already bit me: a PyTorch API change made the UI report no GPU with no visible error. A broad <code>except</code> is acceptable at the UI edge if it logs. Inside the logic, catch only what you expect and let the unexpected blow up.</p>`},
+    {q:'What does batch=-1 do, and when wouldn\'t you use it?', a:`<p>It enables Ultralytics AutoBatch, which probes memory usage and picks the batch that fits in a fraction of VRAM. I wouldn't use it when I need to reproduce an experiment exactly across machines, since batch size changes training dynamics, or on a GPU shared with other processes, where the estimate can be wrong.</p>`}
+  ]
+},
+
+/* 4 · COMBINED DATASET */
+{
+  id: 'dataset', label: '24 classes without forgetting COCO', date: 'Feb 20–21, 2026 · 39d1a9e, 6107f4e, 8883995',
+  focus: ['datos','dataset','entrenar','evaluar'],
+  title: 'You can\'t add classes to YOLO: you retrain with all of them',
+  sub: 'Assisted navigation needed doors, stairs, street lights, traffic signs, trees and wheelchairs, without losing people, cars or bikes. This phase is the technical core of the project.',
+  beats: [
+    {tag:'entender', h:'The detection head gets replaced entirely', body:`<p>YOLO's last layer has one output per class. Train with 6 classes and the head has 6 outputs: the model <strong>forgets COCO's 80</strong>. Freezing the backbone (<code>freeze</code>) keeps the features, not the classes.</p>
+    <p>So the final model has to be trained on <strong>all classes at once</strong>, in a single dataset.</p>`},
+    {tag:'simular', h:'Follow one label into the final dataset', body:`${fig(`
+      <rect class="s-box" x="16" y="16" width="300" height="74" rx="7"/>
+      <text class="s-t" x="166" y="38" text-anchor="middle">COCO subset · FiftyOne</text>
+      <text class="s-d" x="166" y="56" text-anchor="middle">18 classes · IDs 0–17 · 8,000 / 2,000</text>
+      <text class="s-ok" x="166" y="76" text-anchor="middle">person → 0 (list order)</text>
+      <rect class="s-box" x="16" y="116" width="300" height="74" rx="7"/>
+      <text class="s-t" x="166" y="138" text-anchor="middle">nav_custom · Open Images V7</text>
+      <text class="s-d" x="166" y="156" text-anchor="middle">6 classes · IDs 0–5 · 3,608 / 571</text>
+      <text class="s-bad" x="166" y="176" text-anchor="middle">Stairs = 1 → collides with bicycle!</text>
+      <line class="s-line" x1="316" y1="53" x2="400" y2="92" marker-end="url(#arrow)"/>
+      <line class="s-line" x1="316" y1="153" x2="400" y2="112" marker-end="url(#arrow)"/>
+      <text class="s-t" x="360" y="140" text-anchor="middle">+18</text>
+      <rect class="s-box-ok" x="404" y="66" width="250" height="74" rx="7"/>
+      <text class="s-t" x="529" y="90" text-anchor="middle">nav_combined</text>
+      <text class="s-d" x="529" y="108" text-anchor="middle">24 classes · 11,608 / 2,571</text>
+      <text class="s-ok" x="529" y="126" text-anchor="middle">Stairs = 19 · coco_/custom_ prefixes</text>
+      <line class="s-line" x1="654" y1="103" x2="700" y2="103" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="704" y="72" width="170" height="62" rx="7"/>
+      <text class="s-t" x="789" y="98" text-anchor="middle">YOLO26s</text>
+      <text class="s-d" x="789" y="116" text-anchor="middle">24-output head</text>
+    `, '0 0 890 200', 'Two sources, one ID space. FiftyOne exports COCO with IDs 0–17 following the class-list order. The custom set also starts at 0, so it has to shift by +18 or stairs would be trained as bicycles.', 'Two datasets merge by remapping IDs')}
+    ${explain('One label line, before and after', `<p>nav_custom file: <code>1 0.52 0.61 0.20 0.35</code>, which is Stairs with ID 1.</p><p>In nav_combined: <code>19 0.52 0.61 0.20 0.35</code>. Coordinates don't change, only the class. If the remap fails there's no error: the model learns stairs are bicycles and both classes' metrics drop for no obvious reason.</p>`)}`},
+    {tag:'escribir', h:'Download only what you need', body:`${code('docs/TRAINING_PROCESS.md','COCO subset with FiftyOne', [
+      'dataset = foz.load_zoo_dataset(',
+      '    <span class="str">"coco-2017"</span>, split=<span class="str">"train"</span>, label_types=[<span class="str">"detections"</span>],',
+      '    classes=[<span class="str">"person"</span>, <span class="str">"car"</span>, <span class="str">"bus"</span>, ...],   <span class="c1"># relevant ones only</span>',
+      '    max_samples=<span class="num">8000</span>)',
+      '',
+      'view = dataset.filter_labels(<span class="str">"ground_truth"</span>, F(<span class="str">"label"</span>).is_in(MY_CLASSES), only_matches=<span class="kw">True</span>)',
+      'view.export(export_dir=<span class="str">"data/coco_nav/train"</span>, dataset_type=fo.types.YOLOv5Dataset,',
+      '            label_field=<span class="str">"ground_truth"</span>, classes=MY_CLASSES)'
+    ].join('\n'))}
+    <p><strong>Decision:</strong> a subset (~4 GB) instead of full COCO (~20 GB). The base model already saw all of COCO; it only needs enough examples not to forget, and classes like <em>pizza</em> or <em>toaster</em> add nothing to navigation.</p>
+    <p>Training: <code>uv run python scripts/train.py --model yolo26s.pt --data data/nav_combined/dataset.yaml --epochs 50</code>, no <code>freeze</code>. About 122 s per epoch on the RTX 5060 Ti.</p>`,
+    chips:['39d1a9e fine-tuning strategy guide','8883995 track yolo26s_nav.pt']},
+    {tag:'medir', h:'0.47 mAP50, with a wide spread per class', body:`${stats([{num:'0.470', lbl:'mAP50'},{num:'0.311', lbl:'mAP50-95'},{num:'0.558', lbl:'precision'},{num:'0.462', lbl:'recall'}])}
+    ${table(['Class','mAP50','Reading'],[
+      ['Cat (COCO)','0.853','strong'],
+      ['Fire hydrant (COCO)','0.748','strong'],
+      ['Person (COCO)','0.738','strong'],
+      ['Wheelchair','0.696','best custom class'],
+      ['Tree','0.497',''],
+      ['Truck (COCO)','0.418','dropped vs the base model'],
+      ['Traffic sign','0.417',''],
+      ['Door','0.410','high indoor/outdoor variety'],
+      ['Stairs','0.318','critical for the product'],
+      ['Street light','0.044','only 7 validation images']
+    ], [6,8,9])}
+    <p>Best epoch was 37 of 50: the remaining 13 added nothing.</p>`,
+    chips:['6107f4e training results']},
+    {tag:'mirar', h:'What I would do differently', body:`${caveat('Three limits worth saying out loud', `<p><strong>1. Street light at 0.044 isn't a metric:</strong> with 7 validation images the number is noise.</p><p><strong>2. I never evaluated on footage from the glasses.</strong> Validation mixes COCO and Open Images, not the real domain where the model runs.</p><p><strong>3. The dataset merge isn't a script.</strong> Downloading, copying, prefixing and remapping were done by hand following the guide. Today I couldn't rebuild <code>nav_combined</code> with one command.</p>`)}
+    <ul>
+      <li><strong>Hypothesis about Truck, not verified: missing labels.</strong> Open Images images only have my 6 classes labeled. If a truck appears, it's treated as background and the model learns not to detect it. Same for unlabeled doors in COCO photos.</li>
+      <li><strong>Next steps:</strong> a reproducible dataset script, more data for Stairs and Street light, <code>patience=10</code> with 100 epochs, trying <code>yolo26m</code>, and a real-footage test set.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'Why not freeze the backbone and train only a new head on the 6 classes?', a:`<p>Because the new head would have 6 outputs and the model would stop detecting people and cars, which are also needed. <code>freeze</code> keeps learned features, not classes. For one model with 24 classes you train on all 24 together. The alternative is two models side by side, at the cost of double latency and memory.</p>`},
+    {q:'Street light has 0.044 mAP50. Is the model bad at street lights?', a:`<p>I don't know, and that's the point. With 7 validation images, getting two right or wrong changes the number completely. Before concluding anything I need hundreds of validation examples. Knowing when a metric isn't reliable matters as much as the number.</p>`},
+    {q:'You mix images where only some classes are labeled. What\'s the problem?', a:`<p>Missing labels: a real object without a box is treated as background, and the model learns to suppress it. An Open Images photo with an unlabeled truck penalizes detecting trucks. I think it explains part of the Truck drop, but I haven't measured it. You can mitigate it by pseudo-labeling COCO classes on the custom images with the base model and reviewing them, or by filtering images with unlabeled objects.</p>`}
+  ]
+},
+
+/* 5 · SPEED */
+{
+  id: 'velocidad', label: 'Measuring speed honestly', date: 'Feb 20–21, 2026 · 6de1edd, 6107f4e',
+  focus: ['exportar','verificar'],
+  title: 'TensorRT FP16, and how to measure it so the number means something',
+  sub: 'The model shares the GPU with others (depth, gaze), so every millisecond counts. Exporting to TensorRT is easy. Measuring correctly is where it\'s easy to get it wrong.',
+  beats: [
+    {tag:'entender', h:'A latency budget, not brochure FPS', body:`<p>In AriaGuard the detector shares the GPU with other models. What matters is how many milliseconds it uses per frame and how stable that is, more than peak FPS. TensorRT compiles the model for one specific GPU: it fuses layers, picks kernels and uses FP16.</p>`},
+    {tag:'simular', h:'One benchmark iteration, with and without syncing', body:`${fig(`
+      <text class="s-d" x="16" y="22">without torch.cuda.synchronize()</text>
+      <rect class="s-box" x="16" y="30" width="60" height="22" rx="3"/><text class="s-d" x="46" y="45" text-anchor="middle">CPU</text>
+      <rect class="s-box-bad" x="80" y="58" width="300" height="22" rx="3"/><text class="s-bad" x="230" y="73" text-anchor="middle">GPU still working…</text>
+      <line x1="16" y1="90" x2="80" y2="90" style="stroke:var(--danger)" stroke-width="2"/><text class="s-bad" x="90" y="94">clock stops here → "0.4 ms" = wrong</text>
+      <text class="s-d" x="16" y="128">with synchronize()</text>
+      <rect class="s-box" x="16" y="136" width="60" height="22" rx="3"/><text class="s-d" x="46" y="151" text-anchor="middle">CPU</text>
+      <rect class="s-box-ok" x="80" y="164" width="300" height="22" rx="3"/><text class="s-ok" x="230" y="179" text-anchor="middle">GPU working…</text>
+      <line x1="16" y1="196" x2="380" y2="196" style="stroke:var(--ok)" stroke-width="2"/><text class="s-ok" x="390" y="200">clock stops when the GPU is done → real</text>
+    `, '0 0 700 214', 'Illustrative. GPU calls are asynchronous: Python returns as soon as the work is queued. Without syncing, the timer measures queuing, not inference.', 'CPU and GPU timeline with and without synchronization')}
+    <p><strong>Warmup</strong> solves the opposite problem. The first calls include loading the engine, allocating memory and tuning kernels, and can take hundreds of ms. If they land in the mean, they inflate it.</p>`},
+    {tag:'escribir', h:'The measurement loop', body:`${code('scripts/benchmark.py','benchmark_model', [
+      'dummy_img = np.random.randint(<span class="num">0</span>, <span class="num">255</span>, (imgsz, imgsz, <span class="num">3</span>), dtype=np.uint8)',
+      '',
+      '<span class="kw">for</span> _ <span class="kw">in</span> range(warmup):                 <span class="c1"># run and discard</span>',
+      '    model(dummy_img, verbose=<span class="kw">False</span>)',
+      'torch.cuda.synchronize()',
+      '',
+      '<span class="kw">for</span> _ <span class="kw">in</span> range(iterations):',
+      '    start = time.perf_counter()',
+      '    model(dummy_img, verbose=<span class="kw">False</span>)',
+      '    torch.cuda.synchronize()               <span class="c1"># wait for the GPU before stopping the clock</span>',
+      '    times.append(time.perf_counter() - start)',
+      '',
+      '<span class="kw">return</span> {<span class="str">"mean"</span>: ..., <span class="str">"std"</span>: ..., <span class="str">"median"</span>: ..., <span class="str">"fps"</span>: <span class="num">1000</span> / np.mean(times_ms)}'
+    ].join('\n'))}
+    <p>Export: <code>uv run python scripts/export_tensorrt.py --format engine --half</code>.</p>`},
+    {tag:'medir', h:'YOLO26m on RTX 5060 Ti (200 iterations, 20 warmup)', body:`${table(['Format','Mean','Std','FPS','vs PyTorch'],[
+      ['PyTorch','8.86 ms','0.19 ms','112.9','1.0×'],
+      ['ONNX (CPU, not valid)','177.06 ms','10.55 ms','5.6','—'],
+      ['TensorRT FP16','3.02 ms','0.03 ms','331.3','2.9×']
+    ], [1])}
+    ${stats([{num:'2.9×', lbl:'faster than PyTorch', good:true},{num:'110 → 52 W', lbl:'peak power'},{num:'451', lbl:'FPS · YOLO26s FP16 (nav)'}])}
+    <p>At peak, TensorRT also drew less power: 52 W versus 110 W, according to <code>nvidia-smi dmon</code>.</p>`,
+    chips:['6de1edd benchmark guide','6107f4e 451 FPS yolo26s_nav']},
+    {tag:'mirar', h:'What this benchmark does not tell you', body:`${caveat('Limits of the number', `<p><strong>Random-noise image:</strong> no camera decoding and no real objects, so almost no detections. On real video the per-frame time will be higher.</p><p><strong>The 451 FPS has no recorded procedure.</strong> It appears in the project notes, but no command, commit or log comes with it. The documented method is the one behind 331 FPS (YOLO26m). Today I can't reproduce that 451 exactly.</p><p><strong>The ONNX row is invalid:</strong> it ran on CPU because <code>onnxruntime-gpu</code> was missing. Comparing it to the GPU rows makes no sense.</p>`)}
+    <ul>
+      <li><strong>Mean and std only.</strong> For a safety system the tail matters: I'd add p95 and p99. AriaGuard did that later.</li>
+      <li><strong>I didn't measure the FP16 engine's accuracy</strong> against the <code>.pt</code>. FP16 usually loses very little, but "usually" isn't data. I'd run <code>yolo val</code> on both.</li>
+      <li><strong>Desktop GPU</strong>, not the target Jetson.</li>
+      <li><strong>Rule I took away:</strong> every number ships with its command, commit and hardware.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'Why call torch.cuda.synchronize() inside the loop?', a:`<p>Because GPU operations are asynchronous relative to the CPU. Without syncing, <code>perf_counter()</code> stops when the work is queued, not finished, and you measure unrealistically low times. Syncing before stopping the clock ensures you measure the full inference.</p>`},
+    {q:'What is the warmup for?', a:`<p>The first inferences include one-off costs: loading the engine, allocating memory and tuning kernels. They can take hundreds of ms versus ~3 ms steady-state. If they land in the mean they inflate it, and since FPS = 1000/mean, the error carries straight through. You run them and discard them.</p>`},
+    {q:'Does TensorRT FP16 lose accuracy? Did you measure it?', a:`<p>It can lose a little from rounding in sensitive layers. There's no record in this repo of comparing the <code>.engine</code>'s mAP to the <code>.pt</code>'s, so I can't claim anything. It's the first thing I'd do before deploying: <code>yolo val</code> with both on the same set.</p>`}
+  ]
+},
+
+/* 6 · METHODOLOGY */
+{
+  id: 'metodologia', label: 'Build, verify, deploy', date: 'Dec 2025 → Jul 2026 · 5f0e9d4, 7c671ca',
+  focus: ['verificar','usar','framework'],
+  title: 'What "it works" means in an ML repo',
+  sub: 'Code that doesn\'t break, valid data, a model that meets the bar and something that runs where it\'s used are four different things. This phase covers what is verified today and what isn\'t.',
+  beats: [
+    {tag:'entender', h:'Four different questions', body:`${table(['Question','How it\'s answered here','Status'],[
+      ['Does the code do what it says?','pytest unit tests (annotate, split, visualize)','yes'],
+      ['Is the data valid?','dataset integrity tests','yes, locally'],
+      ['Is the model good?','evaluate.py + results.csv','manual'],
+      ['Does it run where it\'s used?','TensorRT export + benchmark','manual, no CI']
+    ])}`},
+    {tag:'simular', h:'A clean clone, before and after the fix', body:`${fig(`
+      <text class="s-d" x="16" y="22">before · uv sync --extra dev && pytest</text>
+      <rect class="s-box" x="16" y="30" width="170" height="40" rx="6"/><text class="s-t" x="101" y="55" text-anchor="middle">collect tests</text>
+      <line class="s-line" x1="186" y1="50" x2="222" y2="50" marker-end="url(#arrow)"/>
+      <rect class="s-box-bad" x="226" y="30" width="270" height="40" rx="6"/><text class="s-bad" x="361" y="55" text-anchor="middle">import transformers → ERROR</text>
+      <line class="s-line" x1="496" y1="50" x2="532" y2="50" marker-end="url(#arrow)"/>
+      <rect class="s-box-bad" x="536" y="30" width="300" height="40" rx="6"/><text class="s-bad" x="686" y="55" text-anchor="middle">run aborted · 45 tests hidden</text>
+      <text class="s-d" x="16" y="104">after · 7c671ca</text>
+      <rect class="s-box" x="16" y="112" width="170" height="40" rx="6"/><text class="s-t" x="101" y="137" text-anchor="middle">dev includes annotation</text>
+      <line class="s-line" x1="186" y1="132" x2="222" y2="132" marker-end="url(#arrow)"/>
+      <rect class="s-box" x="226" y="112" width="270" height="40" rx="6"/><text class="s-t" x="361" y="137" text-anchor="middle">no data/ → skip · partial → fail</text>
+      <line class="s-line" x1="496" y1="132" x2="532" y2="132" marker-end="url(#arrow)"/>
+      <rect class="s-box-ok" x="536" y="112" width="300" height="40" rx="6"/><text class="s-ok" x="686" y="137" text-anchor="middle">45 passed · 9 skipped</text>
+    `, '0 0 850 166', 'One collection error aborts the whole run, and a healthy repo looks broken. The fix makes the dev extra install what the tests import, and makes data tests skip when there is no dataset.', 'pytest flow before and after the fix')}`},
+    {tag:'escribir', h:'The full loop, with its gates', body:`${fig(`
+      ${[['Build','uv · config.yaml','s-box'],['Verify','pytest','s-box-ok'],['Train','train.py','s-box'],['Evaluate','per-class mAP','s-box'],['Export','TensorRT','s-box'],['Deploy','AriaGuard','s-box']].map(([t,d,c],i)=>{
+        const x = 16 + i*146;
+        return `<rect class="${c}" x="${x}" y="24" width="126" height="54" rx="7"/>
+        <text class="s-t" x="${x+63}" y="47" text-anchor="middle">${t}</text><text class="s-d" x="${x+63}" y="65" text-anchor="middle">${d}</text>
+        ${i<5?`<line class="s-line" x1="${x+126}" y1="51" x2="${x+143}" y2="51" marker-end="url(#arrow)"/>`:''}`;}).join('')}
+      <text class="s-bad" x="162" y="100" text-anchor="middle">gate: tests green</text>
+      <text class="s-bad" x="600" y="100" text-anchor="middle">gate: mAP ≥ previous (manual)</text>
+      <text class="s-d" x="455" y="124" text-anchor="middle">deliverable: models/yolo26s_nav.pt in git → each machine builds its own .engine</text>
+    `, '0 0 900 136', 'The actual methodology. Only the first gate is automatic locally, and none run in CI.', 'Loop: build, verify, train, evaluate, export, deploy')}
+    ${code('tests/test_data_integrity.py','skip if missing · fail if incomplete', [
+      '<span class="kw">def</span> <span class="fn">test_train_structure</span>(<span class="kw">self</span>, data_dir):',
+      '    dataset_dir = data_dir / <span class="str">"dataset"</span>',
+      '    <span class="kw">if not</span> dataset_dir.exists():',
+      '        pytest.skip(<span class="str">"data/dataset/ not found (gitignored local artifact)"</span>)',
+      '    <span class="c1"># if it exists, the full structure is required</span>'
+    ].join('\n'))}
+    <p><strong>Decision:</strong> keep <code>yolo26s_nav.pt</code> (20 MB) in git because it's the only artifact that can't be regenerated without retraining. The <code>.engine</code> isn't versioned: it depends on the GPU and the TensorRT version.</p>`,
+    chips:['5f0e9d4 test suite (47 tests)','7c671ca unblock collection','8883995 track model']},
+    {tag:'medir', h:'What the tests cover', body:`${table(['File','What it checks'],[
+      ['test_auto_annotate.py','NMS, YOLO format, template matching'],
+      ['test_split_dataset.py','image/label pairs, ratios'],
+      ['test_visualize.py','loading annotations, pixel conversion'],
+      ['test_grounding_dino.py','zero-shot annotator'],
+      ['test_data_integrity.py','structure, format, coordinate ranges'],
+      ['test_integration.py','configs, models, inference script']
+    ])}
+    ${stats([{num:'45', lbl:'passed', good:true},{num:'9', lbl:'skipped (no data/)'},{num:'0', lbl:'CI jobs'}])}`},
+    {tag:'mirar', h:'Engineering gaps', body:`${caveat('What\'s missing to call it robust', `<p><strong>No CI:</strong> I removed the GitHub Actions pipeline in August 2026, so today nothing stops a merge with failing tests.</p><p><strong>Data tests never run outside my machine.</strong> A test that always skips in CI protects nothing. It needs a tiny sample dataset in <code>tests/fixtures</code>.</p><p><strong>No model regression check:</strong> nothing verifies that retraining doesn't make mAP worse.</p>`)}
+    <ul>
+      <li><strong>No deployed demo:</strong> <code>app.py</code> is already Gradio. A CPU Hugging Face Space with images would be feasible.</li>
+      <li><strong>Model in git</strong> instead of Hugging Face Hub or a Release with a model card. Fine for one, doesn't scale.</li>
+      <li><strong>No Docker and no LICENSE file</strong>, even though <code>pyproject</code> says MIT.</li>
+    </ul>`}
+  ],
+  qa: [
+    {q:'Why version the .pt in git and not the .engine?', a:`<p>The <code>.pt</code> is hours of training and can't be regenerated without redoing it. The <code>.engine</code> is a build for one GPU and one TensorRT version: an engine from my RTX won't run on a Jetson. You version the portable source and each target builds its own. At larger scale I'd use Hugging Face Hub or Releases with versions and a model card.</p>`},
+    {q:'A test that skips when data/ is missing: isn\'t that a test that never fails?', a:`<p>In CI, yes, and that's its weakness. Locally it's useful: it skips with no dataset but fails on an incomplete one, which I verified by creating a partial one. The full fix is a tiny dataset in <code>tests/fixtures</code> so the validation logic always runs.</p>`},
+    {q:'What would you add first to make this "production"?', a:`<p>In order: CI running pytest on CPU, a small data fixture, a reproducible dataset-build script, and a regression evaluation that compares per-class mAP against the previous model before publishing a new one. Then the demo and the model card.</p>`}
+  ]
+},
+
+/* 7 · LOOK BACK */
+{
+  id: 'mirar-atras', label: 'Look back: what I would change', date: 'Sep 2026', focus: 'all',
+  title: 'What turns "I solved it" into "I learned something"',
+  sub: 'The last step of the method, applied to the whole project.',
+  intro: `
+  ${fig(`
+    ${[['1','Leak-free split','by video or scene','s-box-bad'],['2','Dataset script','reproducible nav_combined','s-box-bad'],['3','Real-footage test','from the glasses','s-box-bad'],['4','CI + fixtures','pytest on every push','s-box'],['5','Demo + model card','HF Space / Hub','s-box']].map(([n,t,d,c],i)=>{
+      const x = 16 + i*178;
+      return `<rect class="${c}" x="${x}" y="20" width="160" height="70" rx="7"/>
+      <text class="s-d" x="${x+12}" y="38">${n}</text>
+      <text class="s-t" x="${x+80}" y="58" text-anchor="middle">${t}</text>
+      <text class="s-d" x="${x+80}" y="76" text-anchor="middle">${d}</text>`;}).join('')}
+    <text class="s-bad" x="270" y="112" text-anchor="middle">decide whether the numbers are true</text>
+    <text class="s-d" x="712" y="112" text-anchor="middle">decide maturity</text>
+  `, '0 0 910 124', 'Priorities if I started today. The first three come first because without them the metrics on this page aren\'t fully trustworthy.', 'Five ordered priorities')}
+  <div class="pitch">
+    <span class="lbl">What I learned</span>
+    <p><strong>1. The labels are the project.</strong> Training is one command; getting, remapping and validating labels is where the time goes and where silent errors hide.</p>
+    <p><strong>2. A number without a procedure is worthless.</strong> The 98.7% was leaky, the "43× better" counted boxes and the 451 FPS can't be reproduced. Now every metric ships with its command, commit and hardware.</p>
+    <p><strong>3. Averages hide what matters.</strong> Inverted pillars, Stairs, p95: the critical case has to be measured on its own.</p>
+    <p><strong>4. Silent errors are the expensive ones.</strong> A broad <code>except</code>, a bad ID remap or a random split don't crash: they give a wrong result that looks right.</p>
+  </div>`,
+  beats: [],
+  qa: [
+    {q:'If you started over, what would you do differently from day one?', a:`<p>Design the evaluation before the model: a leak-free split, a test set from the real domain (footage from the glasses) and per-class metrics for the classes the product depends on. In this project evaluation came later, which is why some numbers are optimistic.</p>`},
+    {q:'What would you do with one more week?', a:`<p>Days 1–2: reproducible <code>nav_combined</code> script and a fixed split. Day 3: record and label a real-video test set. Day 4: retrain with <code>patience</code> and compare YOLO26s vs YOLO26m on that set. Day 5: CI, data fixture and model card. No new features until the numbers are measured properly.</p>`},
+    {q:'What are you proudest of, and what was your biggest mistake?', a:`<p>Proudest of the combined-dataset strategy and the annotation flow with human review, which solve the real problem of getting data. My biggest mistake was trusting a 98.7% from a split that leaked frames. It's a classic mistake; I caught it when reviewing the project, and that's why it's explained in the first phase instead of hidden.</p>`}
+  ]
+}
+];
+
+/* ===== Explainer engine (shared across repos) =====
+   Content lives in PAGE (defined above): PAGE.ui.{es,en}, PAGE.steps.{es,en}.
+   Beat tags follow the 5-step method: entender · simular · escribir · medir · mirar */
+let currentLang = 'es';
+let current = 0;
+const KEY = 'explainer-' + PAGE.slug;
+
+function activeSteps(){ return PAGE.steps[currentLang]; }
+
+function renderQA(stepIdx, qaList){
+  if (!qaList || !qaList.length) return '';
+  const t = PAGE.ui[currentLang];
+  return `<div class="qa-section">
+    <div class="qa-section-head"><span class="icon">Q&amp;A</span><h3>${t.qaHeading}</h3></div>
+    ${qaList.map((item, i) => `
+      <div class="qa-item" id="qa-${stepIdx}-${i}">
+        <button class="qa-q" data-qa="${stepIdx}-${i}" aria-expanded="false">
+          <span class="qmark">Q${i+1}</span><span class="qtext">${item.q}</span><span class="chev">›</span>
+        </button>
+        <div class="qa-a">${item.a}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+/* Global map: the whole system, with this phase's part highlighted (zoom out ↔ zoom in) */
+function renderMap(stepIdx, focus){
+  const m = PAGE.map[currentLang], t = PAGE.ui[currentLang];
+  const on = id => focus === 'all' || (focus || []).includes(id);
+  const W = 124, G = 18, X0 = 14;
+  const nodes = m.nodes.map((n, i) => {
+    const x = X0 + i * (W + G);
+    return `<g class="map-node ${on(n.id) ? 'm-on' : 'm-off'}" data-node="${n.id}" tabindex="0" role="button" aria-label="${n.t}">
+      <rect x="${x}" y="14" width="${W}" height="52" rx="7"/>
+      <text class="mt" x="${x + W/2}" y="37" text-anchor="middle">${n.t}</text>
+      <text class="md" x="${x + W/2}" y="54" text-anchor="middle">${n.d}</text></g>
+      ${i < m.nodes.length - 1 ? `<line class="s-line" x1="${x + W}" y1="40" x2="${x + W + G - 3}" y2="40" marker-end="url(#arrow-map-${stepIdx})"/>` : ''}`;
+  }).join('');
+  const total = m.nodes.length * W + (m.nodes.length - 1) * G;
+  const bw = (total - G) / 2;
+  const bands = m.bands.map((b, i) => {
+    const x = X0 + i * (bw + G);
+    return `<g class="map-node ${on(b.id) ? 'm-on' : 'm-off'}" data-node="${b.id}" tabindex="0" role="button" aria-label="${b.t}">
+      <rect x="${x}" y="84" width="${bw}" height="32" rx="7" stroke-dasharray="4 3"/>
+      <text class="mt" x="${x + bw/2}" y="104" text-anchor="middle">${b.t} <tspan class="md">· ${b.d}</tspan></text></g>`;
+  }).join('');
+  return `<figure class="fig map"><div class="fig-card map-card">
+    <svg viewBox="0 0 ${total + 2*X0} 128" role="img" aria-label="${t.mapLabel}">
+      <defs><marker id="arrow-map-${stepIdx}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+      ${nodes}${bands}</svg></div>
+    <figcaption>${t.mapCaption}</figcaption></figure>`;
+}
+
+function render(){
+  const t = PAGE.ui[currentLang];
+  const steps = activeSteps();
+  const stepsEl = document.getElementById('steps');
+  const panelsEl = document.getElementById('panels');
+  stepsEl.innerHTML = ''; panelsEl.innerHTML = '';
+
+  document.title = t.docTitle;
+  document.documentElement.lang = currentLang;
+  document.getElementById('rail').setAttribute('aria-label', t.railAria);
+  document.getElementById('railEyebrow').textContent = t.railEyebrow;
+  document.getElementById('railTitle').textContent = t.railTitle;
+  document.getElementById('railFoot').innerHTML = t.railFoot;
+  document.getElementById('railLinks').innerHTML = t.links.map(l => `<a href="${l.href}">${l.label}</a>`).join('');
+  document.getElementById('langEs').className = currentLang === 'es' ? 'on' : '';
+  document.getElementById('langEn').className = currentLang === 'en' ? 'on' : '';
+
+  steps.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.className = 'step-item' + (i === current ? ' active' : '') + (i < current ? ' done' : '');
+    li.innerHTML = `<button class="step-btn"><span class="step-dot"></span>
+        <span class="step-num">${String(i).padStart(2,'0')} / ${String(steps.length-1).padStart(2,'0')}</span>
+        <div class="step-label">${s.label}</div></button>`;
+    li.querySelector('button').addEventListener('click', () => go(i));
+    stepsEl.appendChild(li);
+
+    const panel = document.createElement('section');
+    panel.className = 'panel' + (i === current ? ' active' : '');
+    panel.id = 'panel-' + s.id;
+    const kicker = i === 0 ? t.summaryKicker : `${t.phase} ${i}`;
+    panel.innerHTML = `
+      <p class="kicker">${kicker} <span class="date">· ${s.date}</span></p>
+      <h1 class="panel-title">${s.title}</h1>
+      <p class="panel-sub">${s.sub}</p>
+      ${renderMap(i, s.focus)}
+      ${s.intro || ''}
+      ${s.beats && s.beats.length ? `<div class="polya">${['entender','simular','escribir','medir','mirar'].map(k => `<span class="${k}">${t.tags[k]}</span>`).join('')}</div>` : ''}
+      ${(s.beats || []).map(b => `
+        <div class="beat">
+          <div class="beat-tag ${b.tag}">${t.tags[b.tag]}</div>
+          <div class="beat-body"><h3>${b.h}</h3>${b.body}
+            ${b.chips ? `<div>${b.chips.map(c => { const [hash, ...rest] = c.split(' ');
+              return `<span class="commit-chip"><span class="hash">${hash}</span>${rest.join(' ')}</span>`; }).join('')}</div>` : ''}
+          </div>
+        </div>`).join('')}
+      ${renderQA(i, s.qa)}`;
+    panelsEl.appendChild(panel);
+  });
+
+  panelsEl.querySelectorAll('.map-node').forEach(g => {
+    const jump = () => { const id = g.dataset.node;
+      const idx = activeSteps().findIndex((st, k) => k > 0 && Array.isArray(st.focus) && st.focus.includes(id));
+      if (idx >= 0) go(idx); };
+    g.addEventListener('click', jump);
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
+  });
+
+  panelsEl.querySelectorAll('.qa-q').forEach(btn => btn.addEventListener('click', () => {
+    const item = btn.parentElement; const open = item.classList.toggle('open');
+    btn.setAttribute('aria-expanded', String(open));
+  }));
+
+  const prev = document.getElementById('prevBtn'), next = document.getElementById('nextBtn');
+  prev.textContent = t.prev; prev.disabled = current === 0;
+  next.textContent = current === steps.length - 1 ? t.end : t.next; next.disabled = current === steps.length - 1;
+  document.getElementById('progressText').textContent = t.progress(current, steps.length - 1);
+  try { localStorage.setItem(KEY + '-step', String(current)); localStorage.setItem(KEY + '-lang', currentLang); } catch(e) {}
+}
+
+function go(i){
+  if (i < 0 || i >= activeSteps().length) return;
+  current = i; render();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+document.getElementById('langToggle').addEventListener('click', () => { currentLang = currentLang === 'es' ? 'en' : 'es'; render(); });
+document.getElementById('prevBtn').addEventListener('click', () => go(current - 1));
+document.getElementById('nextBtn').addEventListener('click', () => go(current + 1));
+document.addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,textarea')) return;
+  if (e.key === 'ArrowRight') go(current + 1);
+  if (e.key === 'ArrowLeft') go(current - 1);
+});
+
+(function init(){
+  const params = new URLSearchParams(location.search);
+  const qLang = params.get('lang');
+  try {
+    const savedLang = localStorage.getItem(KEY + '-lang');
+    if (savedLang === 'es' || savedLang === 'en') currentLang = savedLang;
+    else if ((navigator.language || '').slice(0,2) !== 'es') currentLang = 'en';
+  } catch(e) {}
+  if (qLang === 'es' || qLang === 'en') currentLang = qLang;
+  try {
+    const saved = localStorage.getItem(KEY + '-step');
+    if (saved !== null) current = Math.min(parseInt(saved, 10) || 0, activeSteps().length - 1);
+  } catch(e) {}
+  render();
+})();
+
+</script>
+</body>
+</html>

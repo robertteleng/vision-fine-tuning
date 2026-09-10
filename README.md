@@ -1,39 +1,41 @@
 # Vision Fine-Tuning
 
-Framework para hacer fine-tuning de modelos **YOLO26** (Ultralytics): auto-anotar, entrenar, evaluar y exportar a TensorRT, desde una interfaz Gradio o por CLI.
+A small framework to fine-tune **YOLO26** (Ultralytics) models end to end: auto-annotate, train, evaluate and export to TensorRT, from a Gradio UI or the CLI.
 
-Nació para un caso real: un detector de obstáculos de **24 clases para navegación asistida** de personas ciegas, usado en AriaGuard.
+It was built for a real use case: a **24-class obstacle detector for assisted navigation** for blind and low-vision pedestrians, used in AriaGuard.
 
-## Resultados
+📖 **How it was built** (ES/EN): [robertteleng.github.io/vision-fine-tuning](https://robertteleng.github.io/vision-fine-tuning/)
 
-Modelo `yolo26s_nav.pt`: YOLO26s entrenado con 14K imágenes (18 clases de COCO + 6 clases propias de Open Images V7).
+## Results
 
-| Métrica | Valor |
+Model `yolo26s_nav.pt`: YOLO26s trained on 14K images (18 COCO classes + 6 custom classes from Open Images V7).
+
+| Metric | Value |
 |---|---|
-| mAP50 / mAP50-95 | 0.470 / 0.311 (mejor época 37 de 50) |
+| mAP50 / mAP50-95 | 0.470 / 0.311 (best epoch 37 of 50) |
 | Precision / Recall | 0.558 / 0.462 |
 | TensorRT FP16 | **451 FPS** (2.21 ms/frame), RTX 5060 Ti |
 
-**Límites.** El mAP es modesto y las clases están desbalanceadas. `Stairs`, crítica para el producto, se queda en 0.318. `Street light` saca 0.044 con solo 7 imágenes de validación, así que esa métrica no es fiable. Las mejoras pendientes están en [docs/TRAINING_PROCESS.md](docs/TRAINING_PROCESS.md#mejoras-pendientes).
+**Limitations.** Accuracy is modest and classes are imbalanced. `Stairs`, which matters most for the product, reaches 0.318. `Street light` scores 0.044 with only 7 validation images, so that number is not reliable. Next steps are listed in [docs/TRAINING_PROCESS.md](docs/TRAINING_PROCESS.md#mejoras-pendientes).
 
-## Cómo funciona
+## How it works
 
 ```mermaid
 flowchart LR
-    A[Imágenes / vídeo] --> B[Auto-anotación<br/>Grounding DINO]
-    B --> C[Dataset YOLO<br/>COCO subset + custom]
+    A[Images / video] --> B[Auto-annotation<br/>Grounding DINO]
+    B --> C[YOLO dataset<br/>COCO subset + custom]
     C --> D[Fine-tune YOLO26]
-    D --> E[Evaluación]
+    D --> E[Evaluate]
     E --> F[Export TensorRT FP16 / ONNX]
 ```
 
-**Decisión clave.** YOLO reemplaza la cabeza de detección completa al entrenar, así que no se pueden añadir clases a un modelo COCO sin que olvide las originales. La solución es un **dataset combinado**: un subset de COCO con las clases relevantes más las clases nuevas con los IDs remapeados. Está explicado en detalle en [docs/TRAINING_PROCESS.md](docs/TRAINING_PROCESS.md).
+**Key decision.** Training YOLO replaces the whole detection head, so you cannot add classes to a COCO model without it forgetting the original ones. The approach here is a **combined dataset**: a COCO subset with only the relevant classes, plus the new classes with remapped IDs. Details in [docs/TRAINING_PROCESS.md](docs/TRAINING_PROCESS.md).
 
-Tareas soportadas: detección, segmentación, clasificación, pose y OBB (`yolo26[n/s/m/l/x]`).
+Supported tasks: detection, segmentation, classification, pose and OBB (`yolo26[n/s/m/l/x]`).
 
-## Instalación
+## Install
 
-Requiere [uv](https://docs.astral.sh/uv/) y una GPU NVIDIA con CUDA.
+Requires [uv](https://docs.astral.sh/uv/) and an NVIDIA GPU with CUDA.
 
 ```bash
 git clone https://github.com/robertteleng/vision-fine-tuning.git
@@ -44,10 +46,10 @@ uv sync --extra datasets     # + FiftyOne / Roboflow
 uv sync --extra dev          # + pytest
 ```
 
-## Uso
+## Usage
 
 ```bash
-# Interfaz web: Inference, Metrics, Training, Auto-Annotate, Dataset, Annotations, Info
+# Web UI: Inference, Metrics, Training, Auto-Annotate, Dataset, Annotations, Info
 uv run python app.py                                   # http://localhost:7860
 
 # CLI
@@ -57,31 +59,31 @@ uv run python scripts/auto_annotate_grounding_dino.py --source data/frames/ --pr
 uv run python scripts/export_tensorrt.py --format engine --half
 uv run python scripts/benchmark.py
 
-# Tests (los que dependen de data/ se saltan si no hay dataset)
+# Tests (dataset tests skip themselves when data/ is absent)
 uv run pytest
 ```
 
-Los hiperparámetros están en [`config.yaml`](config.yaml). La GPU se detecta automáticamente y `batch: -1` ajusta el batch a la VRAM disponible.
+Hyperparameters live in [`config.yaml`](config.yaml). The GPU is detected automatically and `batch: -1` sizes the batch to the available VRAM.
 
-## Estructura
+## Layout
 
 ```
-app.py            Interfaz Gradio
-config.yaml       Hiperparámetros de entrenamiento
-src/              Lógica: hardware, project, training, inference, dataset, annotation, benchmark
+app.py            Gradio UI
+config.yaml       Training hyperparameters
+src/              Core logic: hardware, project, training, inference, dataset, annotation, benchmark
 scripts/          CLI: train, inference, evaluate, benchmark, export_tensorrt,
                   auto_annotate(_grounding_dino), review/visualize_annotations, split_dataset
 tests/            pytest
-models/           yolo26s_nav.pt (modelo entrenado)
-docs/             Guías (ver abajo)
+models/           yolo26s_nav.pt (trained model)
+docs/             Guides (Spanish) and the explainer site (index.html)
 ```
 
-## Documentación
+## Docs (Spanish)
 
-- [Proceso de entrenamiento y dataset combinado](docs/TRAINING_PROCESS.md)
-- [Guía de auto-anotación zero-shot](docs/ZERO_SHOT_GUIDE.md)
-- [Guías paso a paso](docs/learning/README.md): pipeline, elección de modelo, TensorRT, benchmark
-- [docs/archive/](docs/archive/): origen del proyecto como detector de objetos VR (YOLOv12s)
+- [Training process and combined dataset](docs/TRAINING_PROCESS.md)
+- [Zero-shot auto-annotation guide](docs/ZERO_SHOT_GUIDE.md)
+- [Step-by-step guides](docs/learning/README.md): pipeline, model choice, TensorRT, benchmark
+- [docs/archive/](docs/archive/): the project's origin as a VR object detector (YOLOv12s)
 
 ## Stack
 
