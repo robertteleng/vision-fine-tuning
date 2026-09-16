@@ -25,7 +25,7 @@ import numpy as np
 import yaml
 
 SCHEMA_VERSION = 1
-PRECISIONS = ("fp32", "fp16", "int8")
+PRECISIONS = ("fp32", "fp16", "int8", "int8_qdq")
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp"}
 
 # Fixed evaluation settings. iou=0.7 is what training validated with, so the
@@ -237,9 +237,13 @@ def memory_used_mb() -> float | None:
 
 
 def make_record(*, environment: dict, command: Sequence[str], model: dict, protocol: dict,
-                latency_ms: dict | None, accuracy: dict | None, memory: dict | None) -> dict:
+                latency_ms: dict | None, accuracy: dict | None, memory: dict | None,
+                status: str = "ok", error: str | None = None) -> dict:
+    """One run. A failed engine build is a result too: status "build_failed" with the error."""
     return {
         "schema": SCHEMA_VERSION,
+        "status": status,
+        "error": error,
         "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "environment": environment,
         "command": list(command),
@@ -306,12 +310,17 @@ def int8_verdict(fp16: dict, int8: dict, criterion: dict = INT8_CRITERION, key_c
 
 def markdown_table(records: Sequence[dict], classes: Sequence[str] = ("Stairs", "Door", "person")) -> str:
     """One row per (host, model, precision), newest record wins. Generated, never hand-edited."""
-    header = ["Device", "Model", "Precision", "Mean ms", "p95 ms", "FPS", "Size MB", "mAP50", "mAP50-95", *classes]
+    header = ["Device", "Model", "Precision", "Mean ms", "p95 ms", "FPS", "Engine ms", "Size MB", "mAP50", "mAP50-95", *classes]
     rows = []
     for (host, name, precision), r in sorted(latest_by_key(records).items(),
                                              key=lambda kv: (kv[0][0], kv[0][1], PRECISIONS.index(kv[0][2]))):
         lat = (r.get("latency_ms") or {}).get("end_to_end")
         acc = r.get("accuracy")
+        if r.get("status") == "build_failed":
+            rows.append([r["environment"].get("gpu") or host, name, precision.upper(),
+                         f"build failed ({r['environment'].get('tensorrt') and 'TensorRT ' + r['environment']['tensorrt']})",
+                         *["—"] * (len(header) - 4)])
+            continue
         rows.append([
             r["environment"].get("gpu") or host,
             name,
@@ -319,6 +328,7 @@ def markdown_table(records: Sequence[dict], classes: Sequence[str] = ("Stairs", 
             f"{lat['mean']:.2f}" if lat else "—",
             f"{lat['p95']:.2f}" if lat else "—",
             f"{lat['fps']:.0f}" if lat else "—",
+            f"{r['latency_ms']['engine_only']['mean']:.2f}" if lat and "engine_only" in r["latency_ms"] else "—",
             f"{r['model']['artifact_mb']:.1f}" if r["model"].get("artifact_mb") is not None else "—",
             f"{acc['map50']:.3f}" if acc else "—",
             f"{acc['map50_95']:.3f}" if acc else "—",

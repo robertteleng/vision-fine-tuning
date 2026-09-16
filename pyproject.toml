@@ -53,6 +53,12 @@ export = [
     "tensorrt-cu12>=10.9,<11; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
+# Explicit INT8 (Q/DQ ONNX) with NVIDIA TensorRT Model Optimizer. The quantized ONNX
+# is portable: each device builds its own engine from the same INT8 scales.
+quantize = [
+    "nvidia-modelopt[onnx]>=0.46.1",
+]
+
 # Development and testing.
 # SELF-SUFFICIENT by design: `uv sync --extra dev && pytest` must be green on a
 # fresh clone. tests/test_grounding_dino.py imports transformers, so without the

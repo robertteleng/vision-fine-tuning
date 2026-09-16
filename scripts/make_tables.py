@@ -26,15 +26,18 @@ def int8_lines(records) -> list[str]:
     latest = eb.latest_by_key(records)
     lines = []
     for (host, name, precision), r in sorted(latest.items()):
-        if precision != "int8" or (host, name, "fp16") not in latest:
+        if precision not in ("int8", "int8_qdq") or (host, name, "fp16") not in latest:
             continue
         fp16 = latest[(host, name, "fp16")]
+        device = r["environment"].get("gpu") or host
+        if r.get("status") == "build_failed":
+            lines.append(f"- **{device} · {name} · {precision.upper()}**: engine could not be built")
+            continue
         if not (r.get("accuracy") and fp16.get("accuracy")):
             continue
         v = eb.int8_verdict(fp16, r)
         checks = ", ".join(f"{k} {c['value']:+.3f} {'✓' if c['pass'] else '✗'}" for k, c in v["checks"].items())
-        device = r["environment"].get("gpu") or host
-        lines.append(f"- **{device} · {name}**: {'use INT8' if v['use_int8'] else 'keep FP16'} ({checks})")
+        lines.append(f"- **{device} · {name} · {precision.upper()}**: {'use it' if v['use_int8'] else 'keep FP16'} ({checks})")
     return lines
 
 

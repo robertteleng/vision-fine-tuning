@@ -83,10 +83,67 @@ def measure_latency(model, images, warmup: int, half: bool) -> dict:
     }
 
 
+def engine_only_latency(engine_file: Path, iterations: int, warmup: int) -> dict:
+    """The TensorRT engine alone: input already on the GPU, no pre/post-processing, no Python pipeline.
+
+    Separates what the network costs from what the surrounding code costs.
+    """
+    import tensorrt as trt
+    import torch
+
+    blob = Path(engine_file).read_bytes()
+    meta_len = int.from_bytes(blob[:4], "little")
+    plan = blob[4 + meta_len:] if 0 < meta_len < 1 << 16 and blob[4:5] == b"{" else blob
+    runtime = trt.Runtime(trt.Logger(trt.Logger.ERROR))
+    engine = runtime.deserialize_cuda_engine(plan)
+    context = engine.create_execution_context()
+    torch_dtype = {trt.float32: torch.float32, trt.float16: torch.float16, trt.int32: torch.int32,
+                   trt.int64: torch.int64, trt.bool: torch.bool, trt.int8: torch.int8}
+    tensors = {}
+    for i in range(engine.num_io_tensors):
+        name = engine.get_tensor_name(i)
+        tensors[name] = torch.zeros(tuple(engine.get_tensor_shape(name)),
+                                    dtype=torch_dtype[engine.get_tensor_dtype(name)], device="cuda")
+        context.set_tensor_address(name, tensors[name].data_ptr())
+    stream = torch.cuda.current_stream().cuda_stream
+    for name, t in tensors.items():
+        if engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
+            t.uniform_(0, 1) if t.is_floating_point() else None
+    for _ in range(warmup):
+        context.execute_async_v3(stream)
+    torch.cuda.synchronize()
+    samples = []
+    for _ in range(iterations):
+        start = time.perf_counter()
+        context.execute_async_v3(stream)
+        torch.cuda.synchronize()
+        samples.append((time.perf_counter() - start) * 1000)
+    return eb.latency_summary(samples)
+
+
 def evaluate(model, dataset_yaml: Path, half: bool, scratch: Path) -> dict:
     metrics = model.val(data=str(dataset_yaml), split="val", device=0, half=half, plots=False, verbose=False,
                         project=str(scratch), name="val", exist_ok=True, **eb.EVAL_SETTINGS)
     return eb.accuracy_summary(metrics, model.names)
+
+
+def build_artifact(weights: Path, precision: str, args) -> dict:
+    if precision == "fp32":
+        return {"artifact": str(weights), "calibration": None, "export_seconds": None, "reused": True}
+    if precision == "int8_qdq":
+        from src import qdq_export
+
+        qdq = qdq_export.qdq_onnx_path(weights, args.qdq_dir)
+        if not qdq.exists() or (args.rebuild and not eb.is_jetson()):
+            try:
+                qdq_export.quantize(weights, args.data, args.qdq_dir, args.calib_images, args.seed)
+            except ImportError as exc:
+                raise RuntimeError(f"{qdq} missing; create it on x86 with `uv sync --extra quantize`") from exc
+        return qdq_export.build_engine(qdq, weights, args.engines_dir, rebuild=args.rebuild)
+    from src.trt_export import export_engine
+
+    return export_engine(weights, precision, args.data, args.engines_dir, args.calib_images, args.seed,
+                         rebuild=args.rebuild)
 
 
 def main():
@@ -99,6 +156,8 @@ def main():
     parser.add_argument("--calib-images", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--engines-dir", type=Path, default=PROJECT_ROOT / "models/engines")
+    parser.add_argument("--qdq-dir", type=Path, default=PROJECT_ROOT / "models/qdq",
+                        help="Shared Q/DQ ONNX files (created on x86 with --extra quantize)")
     parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "benchmarks/results")
     parser.add_argument("--skip-accuracy", action="store_true")
     parser.add_argument("--rebuild", action="store_true", help="Rebuild engines even if they exist")
@@ -112,8 +171,6 @@ def main():
 
     import torch
     from ultralytics import YOLO
-
-    from src.trt_export import export_engine
 
     if not torch.cuda.is_available():
         logger.error("CUDA is required.")
@@ -129,11 +186,18 @@ def main():
     for weights in args.weights:
         for precision in args.precisions:
             logger.info(f"=== {weights.stem} {precision.upper()} ===")
-            if precision == "fp32":
-                artifact = {"artifact": str(weights), "calibration": None, "export_seconds": None, "reused": True}
-            else:
-                artifact = export_engine(weights, precision, args.data, args.engines_dir,
-                                         args.calib_images, args.seed, rebuild=args.rebuild)
+            try:
+                artifact = build_artifact(weights, precision, args)
+            except Exception as exc:  # a failed build is recorded, the run goes on
+                logger.error(f"{weights.stem} {precision}: build failed: {exc}")
+                record = eb.make_record(
+                    environment=environment, command=sys.argv,
+                    model={"name": weights.stem, "precision": precision, "weights": str(weights),
+                           "weights_sha256": eb.sha256(weights)},
+                    protocol={"eval": eb.EVAL_SETTINGS, "dataset": str(args.data)},
+                    latency_ms=None, accuracy=None, memory=None, status="build_failed", error=str(exc)[:2000])
+                logger.info(f"-> {eb.write_record(record, args.out).name}")
+                continue
             path = Path(artifact["artifact"])
             half = False  # FP32 runs as FP32; engine precision is fixed at build time
 
@@ -141,6 +205,8 @@ def main():
             model = YOLO(str(path), task="detect")
             accuracy = None if args.skip_accuracy else evaluate(model, args.data, half, scratch)
             latency = measure_latency(model, images, args.warmup, half)
+            if path.suffix == ".engine":
+                latency["engine_only"] = engine_only_latency(path, len(images), args.warmup)
             memory_after = eb.memory_used_mb()
 
             record = eb.make_record(

@@ -160,6 +160,14 @@ def test_markdown_table_orders_precisions_and_marks_missing_classes():
     rows = table.strip().splitlines()[2:]
     assert [r.split("|")[3].strip() for r in rows] == ["FP32", "FP16", "INT8"]
     assert rows[0].rstrip(" |").endswith("0.300 | —")
+    assert rows[0].split("|")[7].strip() == "—"  # no engine-only latency for this record
+
+
+def test_markdown_table_shows_engine_only_latency():
+    rec = fake_record()
+    rec["latency_ms"]["engine_only"] = {"mean": 4.24}
+    row = eb.markdown_table([rec], classes=()).strip().splitlines()[2]
+    assert row.split("|")[7].strip() == "4.24"
 
 
 # --------------------------------------------------------------------------- INT8 decision
@@ -206,3 +214,25 @@ def test_environment_reads_git_when_no_override(monkeypatch):
     env = eb.environment()
     assert env["git_commit"] and len(env["git_commit"]) == 40
     assert env["container_image"] is None
+
+
+# --------------------------------------------------------------------------- failures and explicit INT8
+
+
+def test_records_default_to_ok_and_failures_show_in_the_table():
+    ok = eb.make_record(environment={"host_tag": "jetson"}, command=[], model={}, protocol={},
+                        latency_ms=None, accuracy=None, memory=None)
+    assert (ok["status"], ok["error"]) == ("ok", None)
+
+    failed = fake_record(host="jetson", precision="int8", gpu="Orin")
+    failed.update(status="build_failed", latency_ms=None, accuracy=None)
+    failed["environment"]["tensorrt"] = "10.3.0"
+    table = eb.markdown_table([fake_record(host="jetson", gpu="Orin"), failed], classes=("Stairs",))
+    row = [r for r in table.splitlines() if "| INT8 |" in r][0]
+    assert "build failed (TensorRT 10.3.0)" in row
+    assert row.count("|") == table.splitlines()[0].count("|")
+
+
+def test_int8_qdq_is_a_known_precision_with_its_own_engine_name(tmp_path):
+    assert eb.PRECISIONS == ("fp32", "fp16", "int8", "int8_qdq")
+    assert eb.engine_path(Path("m/yolo26n_nav.pt"), "int8_qdq", "jetson", tmp_path).name == "yolo26n_nav_int8_qdq_jetson.engine"

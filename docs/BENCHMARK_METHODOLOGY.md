@@ -49,6 +49,12 @@ For a 24-class obstacle detector that has to run on a wearable-class device:
   `torch.cuda.synchronize()`, so asynchronous GPU work is not left out of the interval.
 - Reported for **end to end** and for Ultralytics' pre-process / inference / post-process split:
   mean, std, min, p50, p90, p95, p99, max, and throughput = 1000 / mean.
+- **Engine only** (TensorRT artifacts): the deserialized engine executed through the TensorRT
+  Python API with its input tensor already on the GPU, the same number of timed iterations and
+  warm-up, `torch.cuda.synchronize()` after each run. No pre/post-processing, no host copies, no
+  Ultralytics code. The gap between this and end to end is what the surrounding pipeline costs.
+  On the Jetson it is most of the time (added 2026-09-17, after `trtexec` showed nano and small
+  engines at 4.2 and 6.8 ms while the Python pipeline reported 23.6 ms for both).
 - The benchmark refuses to run while another process uses the GPU (for example a training run).
   `--allow-busy-gpu` exists but the resulting numbers are not published.
 
