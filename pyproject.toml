@@ -43,6 +43,16 @@ datasets = [
     "roboflow>=1.1.0",
 ]
 
+# TensorRT / ONNX export and benchmarking on x86 Linux with an NVIDIA GPU.
+# Declared here so Ultralytics does not pip-install them on the fly during export.
+# (On Jetson these come from JetPack inside the Ultralytics container.)
+export = [
+    "onnx>=1.12.0,<2.0.0",
+    "onnxslim>=0.1.71",
+    "onnxruntime-gpu>=1.20; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "tensorrt-cu12>=10.9,<11; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
 # Development and testing.
 # SELF-SUFFICIENT by design: `uv sync --extra dev && pytest` must be green on a
 # fresh clone. tests/test_grounding_dino.py imports transformers, so without the

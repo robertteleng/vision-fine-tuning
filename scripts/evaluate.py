@@ -111,7 +111,7 @@ def main():
     parser.add_argument("--model", "-m", default=None, help="Model .pt path")
     parser.add_argument("--data", "-d", default=None, help="Dataset YAML path")
     parser.add_argument("--conf", type=float, default=0.001, help="Confidence threshold (default: 0.001)")
-    parser.add_argument("--iou", type=float, default=0.6, help="IoU threshold for mAP")
+    parser.add_argument("--iou", type=float, default=0.7, help="NMS IoU threshold (0.7, as in training validation)")
     parser.add_argument("--split", default="val", choices=["train", "val", "test"], help="Split to evaluate")
     parser.add_argument("--save-json", action="store_true", help="Save COCO JSON results")
     args = parser.parse_args()

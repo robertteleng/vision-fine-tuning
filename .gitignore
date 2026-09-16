@@ -15,9 +15,11 @@
 # -----------------------------------------------------------------------------
 /models/*
 !/models/yolo26s_nav.pt
+!/models/yolo26n_nav.pt
 /runs/
 *.pt
 !models/yolo26s_nav.pt
+!models/yolo26n_nav.pt
 *.pth
 *.onnx
 *.engine
@@ -125,6 +127,8 @@ tb_logs/
 *.avi
 *.mov
 results/
+# benchmark records are the source of every published number
+!/benchmarks/results/
 outputs/
 
 # -----------------------------------------------------------------------------
