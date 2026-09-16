@@ -32,6 +32,10 @@ For a 24-class obstacle detector that has to run on a wearable-class device:
   validated with, so benchmark mAP is comparable with the training curves.
 - Reported: precision, recall, mAP50, mAP50-95, and mAP50 / mAP50-95 **per class**.
 - Every engine is scored itself. Accuracy is never copied from the PyTorch model.
+- Batch 1 on purpose: the engines have a static batch-1 shape, and scoring everything the same
+  way keeps the precisions comparable. Numbers differ slightly from the validation printed during
+  training, which runs batched with rectangular padding (e.g. nano `Stairs` mAP50 0.316 here vs
+  0.330 in the training log). Compare only numbers produced by the same protocol.
 
 ### Latency
 
@@ -106,6 +110,9 @@ only**. Tables are never edited by hand. When a configuration is re-run, the new
 - **End-to-end means Ultralytics' Python pipeline**, not a C++ TensorRT runtime. The inference
   column isolates the engine. A production C++ path would have lower pre- and post-processing cost.
 - **Memory figures are approximate** (whole-device readings, not per-process peaks).
+- **Jetson frequency scaling stays on.** The device runs in `MAXN_SUPER` (recorded) without
+  `jetson_clocks`, so CPU/GPU frequencies can still scale down between bursts. That is the
+  realistic deployment setting, but it can widen the latency tail.
 - **Software versions.** Everything the project controls is identical on every device: dataset,
   weights, benchmark code (git commit) and **Ultralytics 8.4.14** (`uv.lock` on x86, the pinned
   `ultralytics/ultralytics:8.4.14-jetson-jetpack6` image on Jetson). TensorRT, CUDA and the driver
@@ -122,4 +129,7 @@ uv run python scripts/benchmark.py --weights models/yolo26n_nav.pt models/yolo26
 uv run python scripts/make_tables.py
 ```
 
-The Jetson procedure, which runs inside the Ultralytics JetPack container, is added with its first results.
+```bash
+# Jetson (JetPack 6.2), inside the pinned Ultralytics image; commit first, the script refuses a dirty tree
+scripts/jetson/benchmark.sh --weights models/yolo26n_nav.pt models/yolo26s_nav.pt --precisions fp32 fp16 int8
+```
