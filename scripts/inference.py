@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Inference script — Fine-Tuning Studio
+Inference script — navigation obstacle detector
 
 Run inference with trained YOLO models on images, videos, or webcam.
 
@@ -171,7 +171,7 @@ def export_model(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fine-Tuning Studio — Inference")
+    parser = argparse.ArgumentParser(description="Navigation detector — Inference")
 
     parser.add_argument("--source", "-s", default=None, help="Image, directory, video, or webcam index")
     parser.add_argument("--model", "-m", default=None, help="Model path (.pt/.engine/.onnx)")

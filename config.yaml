@@ -1,14 +1,11 @@
 # =============================================================================
-# Fine-Tuning Studio — Configuracion de Entrenamiento
+# Detector de navegacion — receta de entrenamiento
 # =============================================================================
-# Framework universal para fine-tuning de modelos YOLO.
 # La GPU se auto-detecta; batch: -1 ajusta automaticamente segun VRAM.
 #
-# Uso rapido:
-#   uv run python scripts/train.py                          # defaults (medium)
-#   uv run python scripts/train.py -m yolo26s.pt            # small (Jetson)
-#   uv run python scripts/train.py -m yolo26l.pt            # large (server)
-#   uv run python scripts/train.py -m yolo26s.pt -e 50      # small, 50 epochs
+# Es la receta con la que se entrenaron los modelos publicados (n y s):
+#   uv run python scripts/train.py --model yolo26n.pt --data data/nav_combined/dataset.yaml
+#   uv run python scripts/train.py --model yolo26s.pt --data data/nav_combined/dataset.yaml
 #
 # El dataset se auto-detecta desde data/ o se especifica con --data.
 # =============================================================================
@@ -16,20 +13,11 @@
 # -----------------------------------------------------------------------------
 # MODELO BASE
 # -----------------------------------------------------------------------------
-# YOLO26 (Ultralytics >=8.4.14) — NMS-free, end-to-end
-# Variantes disponibles (RTX 5060 Ti 16GB, imgsz=640):
-#   yolo26n.pt  — nano    | batch ~24 | ~60s/epoch  | menos precision
-#   yolo26s.pt  — small   | batch ~11 | ~128s/epoch | edge (Jetson Orin)
-#   yolo26m.pt  — medium  | batch ~5  | ~240s/epoch | desktop GPU
-#   yolo26l.pt  — large   | batch ~3  | ~400s/epoch | server GPU (>24GB ideal)
-#   yolo26x.pt  — xlarge  | batch ~2  | ~600s/epoch | server GPU (>32GB ideal)
-#
-# Override en CLI: python scripts/train.py --model yolo26s.pt
-model: "yolo26m.pt"
-
-# Tarea de vision
-# detect, segment, classify, pose, obb
-task: "detect"
+# YOLO26 (Ultralytics >=8.4.14) — NMS-free, end-to-end.
+#   yolo26n.pt — nano  | objetivo edge (Jetson Orin Nano)
+#   yolo26s.pt — small | referencia de precision
+# Override en CLI: uv run python scripts/train.py --model yolo26s.pt
+model: "yolo26n.pt"
 
 # -----------------------------------------------------------------------------
 # PARAMETROS GPU-DEPENDIENTES
@@ -51,8 +39,10 @@ cache: "ram"
 # -----------------------------------------------------------------------------
 # PARAMETROS DE ENTRENAMIENTO
 # -----------------------------------------------------------------------------
-epochs: 100
-patience: 10       # Regla: patience = 10% de epochs. Con 20 y 50 epochs nunca corto.
+epochs: 50
+patience: 20
+close_mosaic: 10   # ultimas 10 epocas sin mosaic
+cos_lr: false
 lr0: 0.01
 lrf: 0.01
 momentum: 0.937

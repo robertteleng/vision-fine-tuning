@@ -34,29 +34,6 @@ def detect_gpu() -> GPUInfo:
         return GPUInfo(name="Unknown", vram_mb=0, cuda_version="", available=False)
 
 
-def suggest_training_defaults(gpu: GPUInfo | None = None) -> dict:
-    """Suggest training defaults based on GPU capabilities.
-
-    Returns dict with keys: batch, workers, cache, imgsz, amp.
-    """
-    if gpu is None:
-        gpu = detect_gpu()
-
-    if not gpu.available:
-        return {"batch": 4, "workers": 4, "cache": False, "imgsz": 640, "amp": False}
-
-    vram = gpu.vram_gb
-
-    if vram >= 16:
-        return {"batch": -1, "workers": 8, "cache": "ram", "imgsz": 640, "amp": True}
-    elif vram >= 8:
-        return {"batch": -1, "workers": 8, "cache": "ram", "imgsz": 640, "amp": True}
-    elif vram >= 4:
-        return {"batch": 8, "workers": 4, "cache": True, "imgsz": 640, "amp": True}
-    else:
-        return {"batch": 4, "workers": 2, "cache": False, "imgsz": 480, "amp": True}
-
-
 def get_hardware_summary(gpu: GPUInfo | None = None) -> str:
     """Human-readable hardware summary for UI display."""
     if gpu is None:

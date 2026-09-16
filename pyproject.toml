@@ -1,7 +1,7 @@
 [project]
-name = "fine-tuning-studio"
+name = "vision-fine-tuning"
 version = "1.0.0"
-description = "Universal fine-tuning framework for computer vision with YOLO"
+description = "Reproducible YOLO26 pipeline for a navigation obstacle detector, from dataset to edge benchmark"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -51,19 +51,13 @@ datasets = [
 # rather than "an extra is missing".
 dev = [
     "pytest>=7.4.0",
-    "fine-tuning-studio[annotation]",
+    "vision-fine-tuning[annotation]",
 ]
 
 # All optional dependencies
 all = [
-    "fine-tuning-studio[annotation,datasets,dev]",
+    "vision-fine-tuning[annotation,datasets,dev]",
 ]
-
-[project.scripts]
-fts-train = "scripts.train:main"
-fts-inference = "scripts.inference:main"
-fts-benchmark = "scripts.benchmark:main"
-fts-export = "scripts.export_tensorrt:main"
 
 [dependency-groups]
 dev = [

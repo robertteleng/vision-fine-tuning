@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Export script — Fine-Tuning Studio
+Export script — navigation obstacle detector
 
 Export YOLO models to TensorRT, ONNX, and other formats.
 
@@ -117,7 +117,7 @@ def export_model(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Fine-Tuning Studio — Export",
+        description="Navigation detector — Export",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

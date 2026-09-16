@@ -1,104 +1,12 @@
-"""Training routines for YOLO models."""
+"""Read training results produced by Ultralytics runs."""
 
 import csv
 from pathlib import Path
 
-try:
-    import gradio as gr
-except ImportError:
-    gr = None
-
 from src.hardware import detect_gpu, get_hardware_summary
-from src.project import PROJECT_ROOT, find_dataset_yamls
+from src.project import PROJECT_ROOT
 
 RUNS_DIR = PROJECT_ROOT / "runs" / "train"
-
-
-def start_training(epochs, batch_size, model_base, data_yaml_path, progress=gr.Progress() if gr else None):
-    """Start model training.
-
-    Args:
-        epochs: Number of training epochs.
-        batch_size: Batch size (-1 for auto).
-        model_base: Base model name, e.g. "yolo26m.pt".
-        data_yaml_path: Path to dataset YAML file.
-    """
-    try:
-        from ultralytics import YOLO
-        import yaml
-
-        gpu = detect_gpu()
-        if not gpu.available:
-            return "Warning: No GPU detected. Training will run on CPU."
-
-        # Dataset validation
-        data_yaml = Path(data_yaml_path)
-        if not data_yaml.exists():
-            return f"Error: Dataset config not found: {data_yaml}"
-
-        with open(data_yaml) as f:
-            data_config = yaml.safe_load(f)
-
-        dataset_path = Path(data_config.get("path", ""))
-        if not dataset_path.exists():
-            return f"Error: Dataset not found at: {dataset_path}"
-
-        # Load config.yaml for additional training params
-        config_path = PROJECT_ROOT / "config.yaml"
-        extra_params = {}
-        if config_path.exists():
-            with open(config_path) as f:
-                config = yaml.safe_load(f) or {}
-            # Pick training-relevant keys only
-            for key in ("imgsz", "patience", "lr0", "lrf", "momentum", "weight_decay",
-                        "optimizer", "warmup_epochs", "warmup_momentum", "warmup_bias_lr",
-                        "fliplr", "flipud", "degrees", "translate", "scale", "shear",
-                        "perspective", "hsv_h", "hsv_s", "hsv_v", "mosaic", "mixup",
-                        "copy_paste", "amp", "save_period", "plots", "verbose"):
-                if key in config:
-                    extra_params[key] = config[key]
-
-        model = YOLO(model_base)
-
-        results = model.train(
-            data=str(data_yaml),
-            epochs=epochs,
-            batch=batch_size,
-            project=str(RUNS_DIR),
-            **extra_params,
-        )
-
-        return f"Training completed!\n\nResults saved to: {results.save_dir}"
-
-    except RuntimeError as e:
-        if "CUDA out of memory" in str(e):
-            suggested = max(1, batch_size // 2) if batch_size > 0 else 4
-            return f"Out of GPU memory. Try batch size {suggested}."
-        return f"Runtime error: {e}"
-    except Exception as e:
-        return f"Error during training: {e}"
-
-
-def get_training_status():
-    """List recent training runs."""
-    if not RUNS_DIR.exists():
-        return "No previous trainings."
-
-    experiments = sorted(RUNS_DIR.glob("*/"), reverse=True)
-    if not experiments:
-        return "No previous trainings."
-
-    status = "## Previous Trainings\n\n"
-    for exp in experiments[:5]:
-        status += f"- `{exp.name}`\n"
-        results_csv = exp / "results.csv"
-        if results_csv.exists():
-            with open(results_csv) as f:
-                rows = list(csv.DictReader(f))
-                if rows:
-                    status += f"  - Epochs: {len(rows)}\n"
-
-    return status
 
 
 def get_training_metrics():

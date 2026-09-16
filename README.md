@@ -31,7 +31,6 @@ flowchart LR
 
 **Key decision.** Training YOLO replaces the whole detection head, so you cannot add classes to a COCO model without it forgetting the original ones. The approach here is a **combined dataset**: a COCO subset with only the relevant classes, plus the new classes with remapped IDs. Details in [docs/TRAINING_PROCESS.md](docs/TRAINING_PROCESS.md).
 
-Supported tasks: detection, segmentation, classification, pose and OBB (`yolo26[n/s/m/l/x]`).
 
 ## Install
 
@@ -81,9 +80,7 @@ docs/             Guides (Spanish) and the explainer site (index.html)
 ## Docs (Spanish)
 
 - [Training process and combined dataset](docs/TRAINING_PROCESS.md)
-- [Zero-shot auto-annotation guide](docs/ZERO_SHOT_GUIDE.md)
 - [Step-by-step guides](docs/learning/README.md): pipeline, model choice, TensorRT, benchmark
-- [docs/archive/](docs/archive/): the project's origin as a VR object detector (YOLOv12s)
 
 ## Stack
 

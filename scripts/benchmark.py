@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Benchmark script — Fine-Tuning Studio
+Benchmark script — navigation obstacle detector
 
 Compare inference speed across model formats (PyTorch, ONNX, TensorRT).
 
@@ -162,7 +162,7 @@ def run_benchmark(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fine-Tuning Studio — Benchmark")
+    parser = argparse.ArgumentParser(description="Navigation detector — Benchmark")
     parser.add_argument("--model", "-m", default=None, help="Model .pt path")
     parser.add_argument("--imgsz", type=int, default=640, help="Image size")
     parser.add_argument("--iterations", "-n", type=int, default=100, help="Iterations")

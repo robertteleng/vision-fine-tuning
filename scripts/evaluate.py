@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Evaluation script — Fine-Tuning Studio
+Evaluation script — navigation obstacle detector
 
 Compute mAP, precision, recall, and F1 on the validation set.
 
@@ -107,7 +107,7 @@ def evaluate(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fine-Tuning Studio — Evaluate")
+    parser = argparse.ArgumentParser(description="Navigation detector — Evaluate")
     parser.add_argument("--model", "-m", default=None, help="Model .pt path")
     parser.add_argument("--data", "-d", default=None, help="Dataset YAML path")
     parser.add_argument("--conf", type=float, default=0.001, help="Confidence threshold (default: 0.001)")

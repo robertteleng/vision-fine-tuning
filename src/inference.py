@@ -1,4 +1,4 @@
-"""Model loading and inference for all YOLO tasks."""
+"""Model loading and inference."""
 
 from pathlib import Path
 

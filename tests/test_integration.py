@@ -1,5 +1,5 @@
 """
-Integration tests for the Fine-Tuning Studio pipeline.
+Integration tests for the navigation detector pipeline.
 """
 
 import sys
@@ -77,15 +77,6 @@ class TestHardwareModule:
         assert hasattr(gpu, "available")
         assert isinstance(gpu.available, bool)
 
-    def test_suggest_training_defaults(self):
-        from src.hardware import suggest_training_defaults
-
-        defaults = suggest_training_defaults()
-        assert "batch" in defaults
-        assert "workers" in defaults
-        assert "imgsz" in defaults
-        assert "amp" in defaults
-
     def test_get_hardware_summary(self):
         from src.hardware import get_hardware_summary
 
@@ -97,43 +88,24 @@ class TestHardwareModule:
 class TestProjectModule:
     """Tests for src/project.py."""
 
-    def test_get_models_for_task_detect(self):
-        from src.project import get_models_for_task
+    def test_base_models_are_yolo26_nano_and_small(self):
+        from src.project import BASE_MODELS
 
-        models = get_models_for_task("detect")
-        assert len(models) > 0
-        assert all(m.endswith(".pt") for m in models)
-        assert "yolo26m.pt" in models
+        assert BASE_MODELS == ("yolo26n.pt", "yolo26s.pt")
 
-    def test_get_models_for_task_segment(self):
-        from src.project import get_models_for_task
-
-        models = get_models_for_task("segment")
-        assert all("-seg.pt" in m for m in models)
-
-    @pytest.mark.parametrize("task", ["detect", "segment", "classify", "pose", "obb"])
-    def test_registry_names_exist_upstream(self, task):
-        """Every listed weight must be a real Ultralytics asset (no download)."""
+    def test_base_models_exist_upstream(self):
+        """Each base model must be a real Ultralytics asset (checked without downloading)."""
         from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
-        from src.project import get_models_for_task
+        from src.project import BASE_MODELS
 
-        missing = [m for m in get_models_for_task(task) if m.removesuffix(".pt") not in GITHUB_ASSETS_STEMS]
-        assert missing == []
+        assert [m for m in BASE_MODELS if m.removesuffix(".pt") not in GITHUB_ASSETS_STEMS] == []
 
-    def test_get_task_for_model(self):
-        from src.project import get_task_for_model
+    def test_config_uses_a_base_model(self, project_root):
+        from src.project import BASE_MODELS
 
-        assert get_task_for_model("yolo26m.pt") == "detect"
-        assert get_task_for_model("yolo26m-seg.pt") == "segment"
-        assert get_task_for_model("yolo26m-cls.pt") == "classify"
-
-    def test_project_config_from_yaml(self, project_root):
-        from src.project import ProjectConfig
-
-        config = ProjectConfig.from_yaml(project_root / "config.yaml")
-        assert config.imgsz == 640
-        assert config.model == "yolo26m.pt"
+        config = yaml.safe_load((project_root / "config.yaml").read_text())
+        assert config["model"] in BASE_MODELS
 
 
 class TestGroundingDino:

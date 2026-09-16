@@ -1,1 +1,1 @@
-# Tests for Fine-Tuning Studio
+# Tests for the navigation obstacle detector

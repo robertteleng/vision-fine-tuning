@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """
-Training script — Fine-Tuning Studio
+Training script — navigation obstacle detector
 
-Fine-tune YOLO models on custom datasets.
+Fine-tune YOLO26 with the recipe in config.yaml.
 
 Usage:
-    python scripts/train.py                                    # Use config.yaml defaults
-    python scripts/train.py --model yolo26s.pt                 # Small (Jetson, edge)
-    python scripts/train.py --model yolo26m.pt                 # Medium (desktop GPU)
-    python scripts/train.py --model yolo26l.pt                 # Large (server GPU)
-    python scripts/train.py --data data/my_dataset/dataset.yaml
-    python scripts/train.py --epochs 50 --batch 16
+    uv run python scripts/train.py --model yolo26n.pt --data data/nav_combined/dataset.yaml
+    uv run python scripts/train.py --model yolo26s.pt --data data/nav_combined/dataset.yaml
+    uv run python scripts/train.py --epochs 50 --batch 16
 """
 
 import sys
@@ -96,7 +93,7 @@ def train(args):
 
     from ultralytics import YOLO
 
-    model_name = config.get("model", "yolo26m.pt")
+    model_name = config.get("model", "yolo26n.pt")
     # Check models/ directory first, then fall back to Ultralytics auto-download
     model_path = PROJECT_ROOT / "models" / model_name
     if model_path.exists():
@@ -110,7 +107,7 @@ def train(args):
     training_keys = (
         "epochs", "patience", "batch", "imgsz", "workers", "cache",
         "lr0", "lrf", "momentum", "weight_decay", "optimizer",
-        "warmup_epochs", "warmup_momentum", "warmup_bias_lr",
+        "warmup_epochs", "warmup_momentum", "warmup_bias_lr", "close_mosaic", "cos_lr",
         "fliplr", "flipud", "degrees", "translate", "scale", "shear",
         "perspective", "hsv_h", "hsv_s", "hsv_v", "mosaic", "mixup", "copy_paste",
         "save_period", "save", "plots", "device", "amp", "deterministic", "seed",
@@ -172,11 +169,11 @@ def train(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Fine-Tuning Studio — Training",
+        description="Navigation detector — Training",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--config", "-c", default=str(PROJECT_ROOT / "config.yaml"), help="Config YAML path")
-    parser.add_argument("--model", "-m", default=None, help="Model override (e.g. yolo26s.pt, yolo26m.pt, yolo26l.pt)")
+    parser.add_argument("--model", "-m", default=None, help="Model override (yolo26n.pt or yolo26s.pt)")
     parser.add_argument("--data", "-d", default=None, help="Dataset YAML path")
     parser.add_argument("--epochs", "-e", type=int, default=None, help="Epochs override")
     parser.add_argument("--batch", "-b", type=int, default=None, help="Batch size override (-1 = auto)")
