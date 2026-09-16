@@ -1,198 +1,80 @@
 """
-Tests for data integrity - verify dataset format and structure.
+Integrity checks on the local navigation dataset (data/nav_combined).
+
+`data/` is gitignored, so every test skips on a fresh clone. When the dataset
+is present these scan every file: a single bad label is enough to corrupt a
+training run.
 """
 
-import re
+import sys
 from pathlib import Path
 
 import pytest
 
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-class TestDatasetStructure:
-    """Tests for dataset directory structure.
+from src.nav_dataset import CLASS_NAMES, SPLITS, read_manifest  # noqa: E402
 
-    `data/` is gitignored — the dataset is a local artifact, not part of the
-    repo. So these skip when it is absent (matching the rest of this file, which
-    already skips) and only assert structure once a dataset IS present. A hard
-    failure here means "you have not downloaded the data", which is not a defect
-    and would leave the suite permanently red on a fresh clone or in CI.
-    """
-
-    def test_dataset_exists(self, data_dir):
-        """Test that dataset directory exists."""
-        dataset_dir = data_dir / "dataset"
-        if not dataset_dir.exists():
-            pytest.skip("data/dataset/ not found (gitignored local artifact)")
-        assert dataset_dir.is_dir(), "data/dataset/ exists but is not a directory"
-
-    def test_train_structure(self, data_dir):
-        """Test train directory structure."""
-        dataset_dir = data_dir / "dataset"
-        if not dataset_dir.exists():
-            pytest.skip("data/dataset/ not found (gitignored local artifact)")
-
-        train_images = dataset_dir / "train" / "images"
-        train_labels = dataset_dir / "train" / "labels"
-
-        assert train_images.exists(), "train/images/ not found"
-        assert train_labels.exists(), "train/labels/ not found"
-
-    def test_val_structure(self, data_dir):
-        """Test val directory structure."""
-        dataset_dir = data_dir / "dataset"
-        if not dataset_dir.exists():
-            pytest.skip("data/dataset/ not found (gitignored local artifact)")
-
-        val_images = dataset_dir / "val" / "images"
-        val_labels = dataset_dir / "val" / "labels"
-
-        assert val_images.exists(), "val/images/ not found"
-        assert val_labels.exists(), "val/labels/ not found"
-
-    def test_train_has_images(self, data_dir):
-        """Test that train has images."""
-        train_images = data_dir / "dataset" / "train" / "images"
-        if not train_images.exists():
-            pytest.skip("Train images directory not found")
-
-        images = list(train_images.glob("*.jpg")) + list(train_images.glob("*.png"))
-        assert len(images) > 0, "No images in train/images/"
-
-    def test_val_has_images(self, data_dir):
-        """Test that val has images."""
-        val_images = data_dir / "dataset" / "val" / "images"
-        if not val_images.exists():
-            pytest.skip("Val images directory not found")
-
-        images = list(val_images.glob("*.jpg")) + list(val_images.glob("*.png"))
-        assert len(images) > 0, "No images in val/images/"
+EXPECTED_IMAGES = {"train": 8000 + 3608, "val": 2000 + 571}
 
 
-class TestLabelFormat:
-    """Tests for YOLO label format."""
-
-    def test_labels_have_correct_format(self, data_dir):
-        """Test that label files have correct YOLO format."""
-        train_labels = data_dir / "dataset" / "train" / "labels"
-        if not train_labels.exists():
-            pytest.skip("Train labels directory not found")
-
-        label_files = list(train_labels.glob("*.txt"))
-        if not label_files:
-            pytest.skip("No label files found")
-
-        # Check first 10 label files
-        for label_file in label_files[:10]:
-            content = label_file.read_text().strip()
-            if not content:
-                continue  # Empty labels are OK (no objects)
-
-            for line in content.split('\n'):
-                line = line.strip()
-                if not line:
-                    continue
-
-                parts = line.split()
-                assert len(parts) >= 5, f"Invalid format in {label_file.name}: {line}"
-
-                # Class ID should be integer
-                try:
-                    class_id = int(parts[0])
-                    assert class_id >= 0, f"Negative class ID in {label_file.name}"
-                except ValueError:
-                    pytest.fail(f"Invalid class ID in {label_file.name}: {parts[0]}")
-
-                # Coordinates should be floats between 0 and 1
-                for i, coord_name in enumerate(['x_center', 'y_center', 'width', 'height'], 1):
-                    try:
-                        val = float(parts[i])
-                        assert 0 <= val <= 1, f"{coord_name} out of range in {label_file.name}: {val}"
-                    except ValueError:
-                        pytest.fail(f"Invalid {coord_name} in {label_file.name}: {parts[i]}")
-
-    def test_image_label_pairs_match(self, data_dir):
-        """Test that each image has corresponding label."""
-        train_images = data_dir / "dataset" / "train" / "images"
-        train_labels = data_dir / "dataset" / "train" / "labels"
-
-        if not train_images.exists() or not train_labels.exists():
-            pytest.skip("Train directories not found")
-
-        images = list(train_images.glob("*.jpg")) + list(train_images.glob("*.png"))
-        missing_labels = []
-
-        for img in images[:50]:  # Check first 50
-            label_path = train_labels / f"{img.stem}.txt"
-            if not label_path.exists():
-                missing_labels.append(img.name)
-
-        if missing_labels:
-            pytest.fail(f"Images missing labels: {missing_labels[:5]}...")
+@pytest.fixture(scope="module")
+def dataset_dir():
+    path = PROJECT_ROOT / "data" / "nav_combined"
+    if not (path / "images").exists():
+        pytest.skip("data/nav_combined not found (build it with scripts/build_dataset.py)")
+    return path
 
 
-class TestCoordinateRanges:
-    """Tests for coordinate value ranges."""
+@pytest.mark.parametrize("split", SPLITS)
+def test_images_and_labels_pair_up_exactly(dataset_dir, split):
+    images = {p.stem for p in (dataset_dir / "images" / split).iterdir()}
+    labels = {p.stem for p in (dataset_dir / "labels" / split).glob("*.txt")}
+    assert len(images) == EXPECTED_IMAGES[split]
+    assert images == labels
 
-    def test_coordinates_normalized(self, data_dir):
-        """Test that all coordinates are properly normalized (0-1)."""
-        train_labels = data_dir / "dataset" / "train" / "labels"
-        if not train_labels.exists():
-            pytest.skip("Train labels directory not found")
 
-        label_files = list(train_labels.glob("*.txt"))
-        out_of_range = []
+@pytest.mark.parametrize("split", SPLITS)
+def test_images_are_exactly_the_manifest(dataset_dir, split):
+    manifest = {f"coco_{int(i):012d}" for i in read_manifest(PROJECT_ROOT / "data_manifest" / f"coco_{split}.txt")}
+    manifest |= {f"custom_{i}" for i in read_manifest(PROJECT_ROOT / "data_manifest" / f"openimages_{split}.txt")}
+    assert {p.stem for p in (dataset_dir / "images" / split).iterdir()} == manifest
 
-        for label_file in label_files[:20]:
-            content = label_file.read_text().strip()
-            if not content:
+
+@pytest.mark.parametrize("split", SPLITS)
+def test_every_label_line_is_valid_yolo(dataset_dir, split):
+    bad = []
+    for label in (dataset_dir / "labels" / split).glob("*.txt"):
+        lines = [line for line in label.read_text().splitlines() if line.strip()]
+        if not lines:
+            bad.append(f"{label.name}: empty")
+        for line in lines:
+            parts = line.split()
+            if len(parts) != 5:
+                bad.append(f"{label.name}: {line}")
                 continue
+            cls, coords = int(parts[0]), [float(x) for x in parts[1:]]
+            if not 0 <= cls < len(CLASS_NAMES):
+                bad.append(f"{label.name}: class {cls}")
+            if not all(-1e-6 <= v <= 1 + 1e-6 for v in coords) or coords[2] <= 0 or coords[3] <= 0:
+                bad.append(f"{label.name}: coords {coords}")
+    assert bad == [], bad[:10]
 
-            for line_num, line in enumerate(content.split('\n'), 1):
-                line = line.strip()
-                if not line:
-                    continue
 
-                parts = line.split()
-                if len(parts) >= 5:
-                    for i in range(1, 5):
-                        val = float(parts[i])
-                        if val < 0 or val > 1:
-                            out_of_range.append(f"{label_file.name}:{line_num}")
+def test_coco_images_only_use_coco_ids_and_openimages_only_custom_ids(dataset_dir):
+    wrong = []
+    for label in (dataset_dir / "labels" / "val").glob("*.txt"):
+        ids = {int(line.split()[0]) for line in label.read_text().splitlines() if line.strip()}
+        if label.stem.startswith("coco_") and max(ids) >= 18:
+            wrong.append(label.name)
+        if label.stem.startswith("custom_") and min(ids) < 18:
+            wrong.append(label.name)
+    assert wrong == []
 
-        assert len(out_of_range) == 0, f"Coordinates out of range: {out_of_range[:5]}"
 
-    def test_box_dimensions_reasonable(self, data_dir):
-        """Test that box dimensions are reasonable (not too small/large)."""
-        train_labels = data_dir / "dataset" / "train" / "labels"
-        if not train_labels.exists():
-            pytest.skip("Train labels directory not found")
-
-        label_files = list(train_labels.glob("*.txt"))
-        suspicious = []
-
-        for label_file in label_files[:20]:
-            content = label_file.read_text().strip()
-            if not content:
-                continue
-
-            for line in content.split('\n'):
-                line = line.strip()
-                if not line:
-                    continue
-
-                parts = line.split()
-                if len(parts) >= 5:
-                    width = float(parts[3])
-                    height = float(parts[4])
-
-                    # Very small boxes (< 1% of image) might be errors
-                    if width < 0.01 or height < 0.01:
-                        suspicious.append(f"{label_file.name}: tiny box ({width:.3f}x{height:.3f})")
-
-                    # Very large boxes (> 90% of image) might be errors
-                    if width > 0.9 or height > 0.9:
-                        suspicious.append(f"{label_file.name}: huge box ({width:.3f}x{height:.3f})")
-
-        # Just warn, don't fail
-        if suspicious:
-            print(f"\nWarning: Suspicious box dimensions found: {suspicious[:5]}")
+def test_every_class_appears_in_validation(dataset_dir):
+    seen = set()
+    for label in (dataset_dir / "labels" / "val").glob("*.txt"):
+        seen |= {int(line.split()[0]) for line in label.read_text().splitlines() if line.strip()}
+    assert seen == set(range(len(CLASS_NAMES)))
