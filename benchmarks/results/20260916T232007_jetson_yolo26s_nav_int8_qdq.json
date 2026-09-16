@@ -1,0 +1,243 @@
+{
+  "schema": 1,
+  "status": "ok",
+  "error": null,
+  "created": "2026-09-16T23:20:07+00:00",
+  "environment": {
+    "hostname": "jetson-orin",
+    "host_tag": "jetson",
+    "platform": "Linux-5.15.199-tegra-aarch64-with-glibc2.35",
+    "machine": "aarch64",
+    "python": "3.10.12",
+    "torch": "2.5.0a0+872d972e41.nv24.08",
+    "ultralytics": "8.4.14",
+    "tensorrt": "10.3.0",
+    "onnx": "1.20.1",
+    "numpy": "1.26.4",
+    "cuda": "12.6",
+    "cudnn": 90300,
+    "gpu": "Orin",
+    "nvidia_driver": "540.5.0",
+    "l4t_release": "# R36 (release), REVISION: 5.2, GCID: 46426093, BOARD: generic, EABI: aarch64, DATE: Thu Jul 16 18:56:22 UTC 2026",
+    "power_mode": "NV Power Mode: MAXN_SUPER",
+    "cpu": "ARMv8 Processor rev 1 (v8l)",
+    "git_commit": "4a25b04578dceca9c19f93451c67d7815510e063",
+    "git_dirty": false,
+    "container_image": "ultralytics/ultralytics:8.4.14-jetson-jetpack6"
+  },
+  "command": [
+    "scripts/benchmark.py",
+    "--weights",
+    "models/yolo26n_nav.pt",
+    "models/yolo26s_nav.pt",
+    "--precisions",
+    "int8_qdq"
+  ],
+  "model": {
+    "name": "yolo26s_nav",
+    "precision": "int8_qdq",
+    "weights": "models/yolo26s_nav.pt",
+    "weights_sha256": "52764907bbc4bb73c8489fa5f5de8f70e144526e5dd55d834470c966f0efe178",
+    "artifact_mb": 10.959179878234863,
+    "artifact": "/home/robert/Projects/ml/vision-fine-tuning/models/engines/yolo26s_nav_int8_qdq_jetson.engine",
+    "source_onnx": "/home/robert/Projects/ml/vision-fine-tuning/models/qdq/yolo26s_nav_int8_qdq.onnx",
+    "builder_flags": [
+      "INT8",
+      "FP16"
+    ],
+    "fallback_precision": "FP16",
+    "export_seconds": 87.53259391600113,
+    "reused": false,
+    "calibration": {
+      "source": "train",
+      "images": 1000,
+      "seed": 0,
+      "method": "ModelOpt entropy",
+      "high_precision_dtype": "fp16"
+    }
+  },
+  "protocol": {
+    "eval": {
+      "imgsz": 640,
+      "batch": 1,
+      "conf": 0.001,
+      "iou": 0.7
+    },
+    "latency_images": 500,
+    "latency_seed": 0,
+    "latency_conf": 0.25,
+    "warmup": 50,
+    "dataset": "/home/robert/Projects/ml/vision-fine-tuning/data/nav_combined/dataset.yaml"
+  },
+  "latency_ms": {
+    "end_to_end": {
+      "n": 500,
+      "mean": 25.22128517000965,
+      "std": 5.781434588972168,
+      "min": 16.31388900023012,
+      "p50": 24.28178699938144,
+      "p90": 33.999115400001756,
+      "p95": 34.81839229962134,
+      "p99": 35.910882980297174,
+      "max": 39.811714999814285,
+      "fps": 39.64905012806758
+    },
+    "preprocess": {
+      "n": 500,
+      "mean": 7.657289277936798,
+      "std": 4.490706715546898,
+      "min": 2.605394000056549,
+      "p50": 5.0293739996050135,
+      "p90": 14.318632399954367,
+      "p95": 15.261310349433188,
+      "p99": 15.969715601149796,
+      "max": 19.11800900052185,
+      "fps": 130.594517681516
+    },
+    "inference": {
+      "n": 500,
+      "mean": 14.495782877955207,
+      "std": 2.3841892752483624,
+      "min": 11.326820000249427,
+      "p50": 16.236205498898926,
+      "p90": 16.531210199536872,
+      "p95": 16.57225600001766,
+      "p99": 16.96916976978173,
+      "max": 17.903058000229066,
+      "fps": 68.98558073195018
+    },
+    "postprocess": {
+      "n": 500,
+      "mean": 2.1129907780014037,
+      "std": 0.2695659411344028,
+      "min": 1.1873969997395761,
+      "p50": 2.157698999326385,
+      "p90": 2.3276250998605974,
+      "p95": 2.4005255500014755,
+      "p99": 2.821690250711981,
+      "max": 3.2739910002419492,
+      "fps": 473.26283219553915
+    },
+    "engine_only": {
+      "n": 500,
+      "mean": 5.104732237938151,
+      "std": 0.055288460015821245,
+      "min": 5.060350998974172,
+      "p50": 5.0849760009441525,
+      "p90": 5.2353841996591655,
+      "p95": 5.252430600376101,
+      "p99": 5.272822929546237,
+      "max": 5.304230999172432,
+      "fps": 195.8966608606898
+    }
+  },
+  "accuracy": {
+    "precision": 0.5000552180526878,
+    "recall": 0.4112137398207889,
+    "map50": 0.40048777832381255,
+    "map50_95": 0.2627816923323275,
+    "per_class": {
+      "person": {
+        "map50": 0.6776738426015498,
+        "map50_95": 0.440073175001167
+      },
+      "bicycle": {
+        "map50": 0.3346173881282588,
+        "map50_95": 0.17611585164724505
+      },
+      "car": {
+        "map50": 0.4573709817162665,
+        "map50_95": 0.2892282990240359
+      },
+      "motorcycle": {
+        "map50": 0.47755342472913836,
+        "map50_95": 0.25924305599482644
+      },
+      "bus": {
+        "map50": 0.5946509098510575,
+        "map50_95": 0.43816254569637625
+      },
+      "truck": {
+        "map50": 0.26427483718524286,
+        "map50_95": 0.16158466980144806
+      },
+      "traffic light": {
+        "map50": 0.2971936321543629,
+        "map50_95": 0.1447353443682818
+      },
+      "fire hydrant": {
+        "map50": 0.7025683963111884,
+        "map50_95": 0.5104799511637166
+      },
+      "stop sign": {
+        "map50": 0.606921839402866,
+        "map50_95": 0.5314857043316362
+      },
+      "bench": {
+        "map50": 0.20860108760143353,
+        "map50_95": 0.13062336208117925
+      },
+      "chair": {
+        "map50": 0.313665691497697,
+        "map50_95": 0.19301077165687563
+      },
+      "dog": {
+        "map50": 0.6203216682639283,
+        "map50_95": 0.46652242773487496
+      },
+      "cat": {
+        "map50": 0.7719484801314628,
+        "map50_95": 0.5867174515291093
+      },
+      "backpack": {
+        "map50": 0.16369402737968547,
+        "map50_95": 0.08795420014590746
+      },
+      "umbrella": {
+        "map50": 0.5519629477158483,
+        "map50_95": 0.31859501452628064
+      },
+      "handbag": {
+        "map50": 0.1593567936495003,
+        "map50_95": 0.07657384726649526
+      },
+      "suitcase": {
+        "map50": 0.37033198172662407,
+        "map50_95": 0.2094628616138811
+      },
+      "potted plant": {
+        "map50": 0.35489220491093504,
+        "map50_95": 0.19632951209880217
+      },
+      "Door": {
+        "map50": 0.3200610965528489,
+        "map50_95": 0.23001261068643108
+      },
+      "Stairs": {
+        "map50": 0.18575648720777682,
+        "map50_95": 0.06952141664183889
+      },
+      "Street light": {
+        "map50": 0.011297830374753452,
+        "map50_95": 0.009038264299802761
+      },
+      "Traffic sign": {
+        "map50": 0.4356435740632975,
+        "map50_95": 0.32953527595957366
+      },
+      "Tree": {
+        "map50": 0.13423454719307437,
+        "map50_95": 0.08548716120852534
+      },
+      "Wheelchair": {
+        "map50": 0.5971130094227041,
+        "map50_95": 0.36626784149754943
+      }
+    }
+  },
+  "memory": {
+    "used_before_mb": 5592.9609375,
+    "used_after_mb": 4717.609375,
+    "kind": "system RAM (unified)"
+  }
+}
