@@ -68,6 +68,14 @@ Let `gain(X) = Stairs AP50 on the test set of arm X − arm A`.
   Grounding DINO draws its own boxes, which may split or merge differently from the annotators.
 - **Nano only.** The small model is not retrained.
 
+## Notes during execution
+
+- **2026-09-16, test set size.** The Open Images V7 test split has only 131 images with a `Stairs`
+  box, 120 of them with at least one non-group box. The test set is therefore those 120 images,
+  with 140 instances; the design said "up to 500". It is still about 3× the 45 validation
+  instances, but differences of a few hundredths remain noisy. The *K* = 1,000 extra training
+  images carry 1,291 human `Stairs` boxes (77 `IsGroupOf`).
+
 ---
 
 ## Results
