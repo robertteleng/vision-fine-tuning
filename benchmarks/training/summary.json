@@ -1,0 +1,43 @@
+{
+  "yolo26s_nav": {
+    "base_model": "yolo26s.pt",
+    "epochs_run": 50,
+    "best_epoch": 37,
+    "best_val_map50": 0.47039,
+    "best_val_map50_95": 0.3113,
+    "train_minutes": 100.5,
+    "recipe": {
+      "epochs": 50,
+      "patience": 20,
+      "batch": -1,
+      "imgsz": 640,
+      "seed": 42,
+      "close_mosaic": 10,
+      "lr0": 0.01,
+      "optimizer": "auto",
+      "amp": true,
+      "cache": "ram"
+    }
+  },
+  "yolo26n_nav": {
+    "base_model": "yolo26n.pt",
+    "epochs_run": 50,
+    "best_epoch": 50,
+    "best_val_map50": 0.39512,
+    "best_val_map50_95": 0.26048,
+    "train_minutes": 61.1,
+    "recipe": {
+      "epochs": 50,
+      "patience": 20,
+      "batch": -1,
+      "imgsz": 640,
+      "seed": 42,
+      "close_mosaic": 10,
+      "lr0": 0.01,
+      "optimizer": "auto",
+      "amp": true,
+      "cache": "ram"
+    },
+    "note": "best epoch is the last one: still improving at 50 epochs, likely undertrained"
+  }
+}
