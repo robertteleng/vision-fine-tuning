@@ -111,6 +111,16 @@ class TestProjectModule:
         models = get_models_for_task("segment")
         assert all("-seg.pt" in m for m in models)
 
+    @pytest.mark.parametrize("task", ["detect", "segment", "classify", "pose", "obb"])
+    def test_registry_names_exist_upstream(self, task):
+        """Every listed weight must be a real Ultralytics asset (no download)."""
+        from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
+
+        from src.project import get_models_for_task
+
+        missing = [m for m in get_models_for_task(task) if m.removesuffix(".pt") not in GITHUB_ASSETS_STEMS]
+        assert missing == []
+
     def test_get_task_for_model(self):
         from src.project import get_task_for_model
 

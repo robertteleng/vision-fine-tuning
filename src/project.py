@@ -9,7 +9,10 @@ PROJECT_ROOT = Path(__file__).parent.parent
 # Model registry — all supported YOLO families, sizes, and tasks
 # ---------------------------------------------------------------------------
 
-YOLO_FAMILIES = ["yolo26", "yolo12", "yolov11", "yolov8"]
+YOLO_FAMILIES = ["yolo26", "yolo12", "yolo11", "yolov8"]
+
+# Ultralytics only publishes detection weights for YOLO12.
+DETECT_ONLY_FAMILIES = {"yolo12"}
 
 YOLO_SIZES = ["n", "s", "m", "l", "x"]
 
@@ -30,6 +33,8 @@ def get_models_for_task(task: str = "detect", families: list[str] | None = None)
     """
     suffix = YOLO_TASKS.get(task, "")
     families = families or YOLO_FAMILIES
+    if suffix:
+        families = [fam for fam in families if fam not in DETECT_ONLY_FAMILIES]
     return [f"{fam}{size}{suffix}.pt" for fam in families for size in YOLO_SIZES]
 
 
