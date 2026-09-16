@@ -1,0 +1,11 @@
+{
+  "qdq_onnx": "models/qdq/yolo26n_nav_int8_qdq.onnx",
+  "calibration": {
+    "source": "train",
+    "images": 1000,
+    "seed": 0,
+    "method": "ModelOpt entropy",
+    "high_precision_dtype": "fp16"
+  },
+  "quantize_seconds": 418.1113475539969
+}

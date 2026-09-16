@@ -22,6 +22,9 @@
 !models/yolo26n_nav.pt
 *.pth
 *.onnx
+# explicit INT8 (Q/DQ) models: the shared source of INT8 scales for every device
+!/models/qdq/
+!/models/qdq/*.onnx
 *.engine
 *.mlmodel
 *.tflite
