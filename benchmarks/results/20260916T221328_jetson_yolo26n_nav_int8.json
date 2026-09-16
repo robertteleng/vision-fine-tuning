@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "status": "build_failed",
+  "error": "TensorRT engine build failed, check logs for errors",
+  "created": "2026-09-16T22:13:28+00:00",
+  "environment": {
+    "hostname": "jetson-orin",
+    "host_tag": "jetson",
+    "platform": "Linux-5.15.199-tegra-aarch64-with-glibc2.35",
+    "machine": "aarch64",
+    "python": "3.10.12",
+    "torch": "2.5.0a0+872d972e41.nv24.08",
+    "ultralytics": "8.4.14",
+    "tensorrt": "10.3.0",
+    "onnx": "1.20.1",
+    "numpy": "1.26.4",
+    "cuda": "12.6",
+    "cudnn": 90300,
+    "gpu": "Orin",
+    "nvidia_driver": "540.5.0",
+    "l4t_release": "# R36 (release), REVISION: 5.2, GCID: 46426093, BOARD: generic, EABI: aarch64, DATE: Thu Jul 16 18:56:22 UTC 2026",
+    "power_mode": "NV Power Mode: MAXN_SUPER",
+    "cpu": "ARMv8 Processor rev 1 (v8l)",
+    "git_commit": "6556d97f8365f3f436b464043aa2f81741b715d7",
+    "git_dirty": false,
+    "container_image": "ultralytics/ultralytics:8.4.14-jetson-jetpack6"
+  },
+  "command": [
+    "scripts/benchmark.py",
+    "--weights",
+    "models/yolo26n_nav.pt",
+    "models/yolo26s_nav.pt",
+    "--precisions",
+    "fp16",
+    "int8"
+  ],
+  "model": {
+    "name": "yolo26n_nav",
+    "precision": "int8",
+    "weights": "models/yolo26n_nav.pt",
+    "weights_sha256": "4fc773606c2a15daec891d8d7e92d5a6c2042a6e076c96cb285828b4bd944eac"
+  },
+  "protocol": {
+    "eval": {
+      "imgsz": 640,
+      "batch": 1,
+      "conf": 0.001,
+      "iou": 0.7
+    },
+    "dataset": "/home/robert/Projects/ml/vision-fine-tuning/data/nav_combined/dataset.yaml"
+  },
+  "latency_ms": null,
+  "accuracy": null,
+  "memory": null
+}
