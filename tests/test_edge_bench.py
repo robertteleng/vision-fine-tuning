@@ -185,3 +185,24 @@ def test_int8_verdict_passes_only_when_all_checks_pass():
 def test_int8_criterion_was_fixed_before_measuring():
     assert eb.INT8_CRITERION["decided_on"] == "2026-09-16"
     assert eb.EVAL_SETTINGS == {"imgsz": 640, "batch": 1, "conf": 0.001, "iou": 0.7}
+
+
+# --------------------------------------------------------------------------- environment
+
+
+def test_environment_takes_commit_and_container_from_host_variables(monkeypatch):
+    monkeypatch.setenv("BENCH_GIT_COMMIT", "abc123")
+    monkeypatch.setenv("BENCH_GIT_DIRTY", "0")
+    monkeypatch.setenv("BENCH_CONTAINER_IMAGE", "ultralytics/ultralytics:8.4.14-jetson-jetpack6")
+    env = eb.environment()
+    assert env["git_commit"] == "abc123"
+    assert env["git_dirty"] is False
+    assert env["container_image"] == "ultralytics/ultralytics:8.4.14-jetson-jetpack6"
+
+
+def test_environment_reads_git_when_no_override(monkeypatch):
+    for var in ("BENCH_GIT_COMMIT", "BENCH_GIT_DIRTY", "BENCH_CONTAINER_IMAGE"):
+        monkeypatch.delenv(var, raising=False)
+    env = eb.environment()
+    assert env["git_commit"] and len(env["git_commit"]) == 40
+    assert env["container_image"] is None

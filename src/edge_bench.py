@@ -199,10 +199,15 @@ def environment() -> dict:
     env["nvidia_driver"] = _run(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"])
     if is_jetson():
         env["l4t_release"] = Path("/etc/nv_tegra_release").read_text().splitlines()[0].strip()
-        env["power_mode"] = _run(["nvpmodel", "-q"])
+        env["power_mode"] = os.environ.get("BENCH_POWER_MODE") or _run(["nvpmodel", "-q"])
     env["cpu"] = _cpu_model()
-    env["git_commit"] = _run(["git", "-C", str(Path(__file__).parent.parent), "rev-parse", "HEAD"])
-    env["git_dirty"] = bool(_run(["git", "-C", str(Path(__file__).parent.parent), "status", "--porcelain", "--untracked-files=no"]))
+    # Inside a container git and nvpmodel may be missing: the host passes them in.
+    repo = str(Path(__file__).parent.parent)
+    env["git_commit"] = os.environ.get("BENCH_GIT_COMMIT") or _run(["git", "-C", repo, "rev-parse", "HEAD"])
+    dirty = os.environ.get("BENCH_GIT_DIRTY")
+    env["git_dirty"] = dirty == "1" if dirty is not None else bool(
+        _run(["git", "-C", repo, "status", "--porcelain", "--untracked-files=no"]))
+    env["container_image"] = os.environ.get("BENCH_CONTAINER_IMAGE")
     return env
 
 
