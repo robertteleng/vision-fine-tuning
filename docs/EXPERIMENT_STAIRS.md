@@ -80,4 +80,37 @@ Let `gain(X) = Stairs AP50 on the test set of arm X − arm A`.
 
 ## Results
 
-*(appended after the runs)*
+**Run on 2026-09-17** (commit of the tooling `6642e46`; numbers from `benchmarks/experiment_stairs/`).
+
+### Pseudo-label quality
+
+Grounding DINO drew **1,554** boxes on the 1,000 extra images against **1,291** human boxes. At IoU ≥ 0.5:
+**precision 0.594, recall 0.715**. 17 images got no box at all.
+
+### Models
+
+| Arm | Stairs AP50 (test, 140 inst.) | Stairs AP50-95 (test) | Global mAP50 (val) | Stairs mAP50 (val, 45 inst.) |
+|---|---|---|---|---|
+| A · baseline | 0.464 | 0.240 | 0.396 | 0.316 |
+| B · + auto labels | 0.543 | 0.326 | 0.398 | 0.443 |
+| C · + human labels | **0.590** | **0.331** | **0.411** | 0.381 |
+
+`gain(B) = +0.079`, `gain(C) = +0.126`. Arm B's global validation mAP50 is **0.001 above** A.
+
+### Verdict (pre-registered criterion)
+
+`gain(C) = 0.126 ≥ 0.02` and `gain(B) = 0.079 ≥ 0.5 × gain(C) = 0.063`, with no validation regression →
+**auto-annotation is worth using for `Stairs`**. Zero-shot labels captured **63 %** of the gain that
+human labels on the same images deliver.
+
+### Reading the result
+
+- **The boxes themselves are nearly as good as human ones.** At the stricter AP50-95, B and C are within 0.005.
+  Most of what B loses comes from spurious and missed stairs (precision 0.59, recall 0.72 against
+  humans), not from sloppy box geometry.
+- **More stairs data helps a lot**: +0.126 AP50 with human labels, from 484 to 1,484 training
+  images with stairs. The class was data-starved.
+- Human labels also lifted global mAP50 by 0.015. Auto labels were neutral.
+- **Limits, as pre-registered:** one seed per arm; 140 test instances; Open Images photos, not egocentric
+  footage. On validation, B scores above C on `Stairs` (0.443 vs 0.381), which shows how noisy the 45
+  instances are and why the test set was the primary metric.
