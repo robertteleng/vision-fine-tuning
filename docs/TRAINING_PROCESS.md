@@ -30,85 +30,40 @@ Crear un dataset que combine:
 ## Pipeline completo
 
 ```
-1. Identificar clases COCO relevantes para tu caso de uso
-2. Descargar COCO subset via FiftyOne            → data/coco_nav/
-3. Preparar dataset custom (Open Images, manual)  → data/nav_custom/
-4. Combinar ambos con IDs remapeados              → data/nav_combined/
-5. Entrenar YOLO26 con dataset combinado
-6. Exportar a TensorRT FP16
-7. Testear con video real
+1. Elegir las clases COCO relevantes para el caso de uso
+2. Fijar las imagenes por ID en data_manifest/          (COCO 2017 + Open Images V7)
+3. Construir el dataset combinado con IDs remapeados    → scripts/build_dataset.py
+4. Entrenar YOLO26 con el dataset combinado             → scripts/train.py
+5. Evaluar por clase y exportar a TensorRT              → scripts/benchmark.py
 ```
 
-### Paso 1 — Descargar COCO subset
-
-```python
-import fiftyone.zoo as foz
-
-dataset = foz.load_zoo_dataset(
-    "coco-2017",
-    split="train",
-    label_types=["detections"],
-    classes=["person", "car", "bus", ...],  # Solo clases relevantes
-    max_samples=8000,
-)
-```
-
-### Paso 2 — Exportar a formato YOLO
-
-```python
-from fiftyone import ViewField as F
-
-view = dataset.filter_labels(
-    "ground_truth",
-    F("label").is_in(MY_CLASSES),
-    only_matches=True,
-)
-view.export(
-    export_dir="data/coco_nav/train",
-    dataset_type=fo.types.YOLOv5Dataset,
-    label_field="ground_truth",
-    classes=MY_CLASSES,
-)
-```
-
-**Nota**: FiftyOne puede crear subdirectorios extra con el nombre del split
-(ej: `images/val/` dentro de `train/`). Verificar la estructura antes de combinar.
-
-### Paso 3 — Combinar datasets
-
-- Copiar imagenes de ambas fuentes a `nav_combined/images/{train,val}/`
-- Prefijos para evitar colisiones: `coco_*.jpg`, `custom_*.jpg`
-- Labels de COCO: IDs ya correctos (0-N segun orden de clases)
-- Labels custom: remapear IDs (ej: 0-5 → 18-23)
-
-### Paso 4 — dataset.yaml
-
-```yaml
-path: /path/to/data/nav_combined
-train: ./images/train/
-val: ./images/val/
-names:
-  0: person        # COCO
-  1: bicycle       # COCO
-  ...
-  17: potted plant  # COCO
-  18: Door          # custom
-  19: Stairs        # custom
-  ...
-  23: Wheelchair    # custom
-```
-
-### Paso 5 — Entrenar
+### Construir el dataset
 
 ```bash
-uv run python scripts/train.py \
-  --model yolo26s.pt \
-  --data data/nav_combined/dataset.yaml \
-  --epochs 50
+uv sync --extra datasets
+uv run python scripts/build_dataset.py --out data/nav_combined --download
 ```
 
-Sin `freeze` — el modelo necesita aprender la nueva cabeza de deteccion
-con todas las clases.
+- Las imagenes vienen de la cache de FiftyOne; las que falten se descargan por ID.
+- Las etiquetas se convierten desde las anotaciones originales (JSON de COCO, CSV de Open Images).
+  No se exporta desde FiftyOne, asi el resultado depende solo de los manifiestos.
+- Se conservan las cajas `iscrowd` de COCO y las `IsGroupOf` de Open Images.
+- Las clases de Open Images van a los IDs 18-23, detras de las 18 de COCO.
+- `--verify <dataset>` compara las etiquetas con un dataset existente. Reconstruido desde cero, coincide
+  con el usado para entrenar en las 14.179 imagenes.
+
+**Por que manifiestos y no una regla.** Las imagenes COCO son las primeras por ID que contienen alguna
+clase de navegacion, pero las de Open Images salieron de una descarga anterior que no se puede
+reproducir con una regla. Fijar los IDs garantiza el mismo dataset.
+
+### Entrenar
+
+```bash
+uv run python scripts/train.py --model yolo26n.pt --data data/nav_combined/dataset.yaml
+```
+
+Sin `freeze`: el modelo tiene que aprender la nueva cabeza de deteccion con todas las clases.
+La receta completa esta en `config.yaml` (50 epocas, patience 20, close_mosaic 10, seed 42).
 
 ## Ejemplo: nav_combined (navegacion asistida)
 
@@ -134,51 +89,31 @@ Door, Stairs, Street light, Traffic sign, Tree, Wheelchair
 | train | 8,000 | 3,608 | 11,608 |
 | val | 2,000 | 571 | 2,571 |
 
-### Referencia de tiempos (RTX 5060 Ti 16GB)
+### Resultados
 
-| Dataset | Imagenes | Batch | Tiempo/epoch |
-|---------|----------|-------|-------------|
-| nav_combined (24 clases) | 11,608 | 11 | ~122s |
-| nav_custom (6 clases) | 3,608 | 11 | ~31s |
+Estan en el [README](../README.md#results), generados desde `benchmarks/`. Resumen del entrenamiento
+(`benchmarks/training/summary.json`):
 
-## Resultados: nav_combined_24cls (YOLO26s, 50 epochs)
+| Modelo | Mejor epoca | mAP50 val | mAP50-95 val | Tiempo (RTX 5060 Ti) |
+|--------|-------------|-----------|--------------|----------------------|
+| YOLO26s | 37/50 | 0.470 | 0.311 | ~100 min |
+| YOLO26n | 50/50 | 0.395 | 0.260 | ~61 min |
 
-| Metrica | Valor |
-|---------|-------|
-| Mejor epoca | 37/50 |
-| mAP50 | 0.470 |
-| mAP50-95 | 0.311 |
-| Precision | 0.558 |
-| Recall | 0.462 |
-| TensorRT FP16 | 451 FPS (2.21ms) |
-
-### Metricas por clase custom (mAP50)
-
-| Clase | mAP50 | Problema |
-|-------|-------|----------|
-| Wheelchair | 0.696 | — |
-| Tree | 0.497 | — |
-| Traffic sign | 0.417 | — |
-| Door | 0.410 | Variabilidad alta (interiores/exteriores) |
-| Stairs | 0.318 | Pocas variantes, contexto dificil |
-| Street light | 0.044 | Solo 7 imgs en val, datos insuficientes |
+Las clases con pocas instancias de validacion dan mAP ruidoso: `Stairs` tiene 45 instancias en 36
+imagenes y `Street light` 40 en 7.
 
 ## Mejoras pendientes
 
-1. **Mas datos para clases debiles** — Street light necesita minimo 200+ imgs val.
-   Stairs y Door mejorarian con mas variedad (diferentes angulos, iluminacion)
-2. **Entrenar con epochs=100, patience=10** — El primer entrenamiento uso 50 epochs
-   fijos. El modelo convergio en epoch 37 y desperdicio 13 epochs. Con patience=10
-   habria cortado antes y con mas epochs disponibles podria haber llegado mas lejos
-3. **Probar yolo26m.pt** — Modelo medium tiene mas capacidad. Con batch ~5 en
-   RTX 5060 Ti, tardaria ~240s/epoch pero podria mejorar mAP en clases dificiles
-4. **Aumentar datos COCO** — Subir de 8K a 12K imagenes COCO para reforzar
-   las clases que bajaron respecto al modelo base (ej: Truck mAP50=0.418)
-5. **Data augmentation especifica** — Mas rotacion para Stairs, mas variacion
-   de iluminacion para Street light (escenas nocturnas)
+1. **Mas datos para las clases debiles.** Para `Stairs` ya esta medido: 1.000 imagenes mas suben su
+   AP50 de 0.464 a 0.590, o a 0.543 si se autoanotan con Grounding DINO
+   (ver [EXPERIMENT_STAIRS.md](EXPERIMENT_STAIRS.md)). `Street light` necesita bastantes mas imagenes de validacion.
+2. **Mas epocas para nano:** su mejor epoca fue la ultima.
+3. **Etiquetas parciales:** las imagenes de Open Images no etiquetan personas ni coches como clases COCO,
+   y las de COCO no etiquetan puertas ni escaleras. Completarlas (por ejemplo con autoanotacion) quitaria
+   falsos negativos al entrenar.
 
 ## Herramientas
 
 - **FiftyOne**: Descarga de COCO y Open Images V7 con filtros por clase
 - **Ultralytics YOLO26**: Entrenamiento, export, inferencia
-- **TensorRT**: Export FP16 para maxima velocidad
+- **TensorRT**: export FP16 (y experimentos INT8, ver `BENCHMARK_METHODOLOGY.md`)

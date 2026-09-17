@@ -29,7 +29,7 @@ def int8_lines(records) -> list[str]:
         if precision not in ("int8", "int8_qdq") or (host, name, "fp16") not in latest:
             continue
         fp16 = latest[(host, name, "fp16")]
-        device = r["environment"].get("gpu") or host
+        device = eb._device(r, host)
         if r.get("status") == "build_failed":
             lines.append(f"- **{device} · {name} · {precision.upper()}**: engine could not be built")
             continue

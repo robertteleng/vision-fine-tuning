@@ -308,6 +308,11 @@ def int8_verdict(fp16: dict, int8: dict, criterion: dict = INT8_CRITERION, key_c
 # --------------------------------------------------------------------------- tables
 
 
+def _device(record: dict, host: str) -> str:
+    gpu = record["environment"].get("gpu") or host
+    return f"Jetson {gpu}" if record["environment"].get("host_tag") == "jetson" and not gpu.startswith("Jetson") else gpu
+
+
 def markdown_table(records: Sequence[dict], classes: Sequence[str] = ("Stairs", "Door", "person")) -> str:
     """One row per (host, model, precision), newest record wins. Generated, never hand-edited."""
     header = ["Device", "Model", "Precision", "Mean ms", "p95 ms", "FPS", "Engine ms", "Size MB", "mAP50", "mAP50-95", *classes]
@@ -317,12 +322,12 @@ def markdown_table(records: Sequence[dict], classes: Sequence[str] = ("Stairs", 
         lat = (r.get("latency_ms") or {}).get("end_to_end")
         acc = r.get("accuracy")
         if r.get("status") == "build_failed":
-            rows.append([r["environment"].get("gpu") or host, name, precision.upper(),
+            rows.append([_device(r, host), name, precision.upper(),
                          f"build failed ({r['environment'].get('tensorrt') and 'TensorRT ' + r['environment']['tensorrt']})",
                          *["—"] * (len(header) - 4)])
             continue
         rows.append([
-            r["environment"].get("gpu") or host,
+            _device(r, host),
             name,
             precision.upper(),
             f"{lat['mean']:.2f}" if lat else "—",

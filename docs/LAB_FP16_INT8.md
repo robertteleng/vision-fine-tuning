@@ -1,6 +1,12 @@
-# Lab 07 · FP32 → FP16 → INT8 en la RTX 5060 Ti
+# Lab · FP32 → FP16 → INT8 en la RTX 5060 Ti
 
-> Lab para hacer **tú**, paso a paso y tomando notas. La IA puede ayudarte, pero escalando la ayuda: pregunta → pista → señalar el error → solución, solo al final (ver `learning/robotics-interview-prep/METODO.md`).
+> **Resultados reales del proyecto:** este lab es un ejercicio de aprendizaje, escrito antes de medir.
+> Las mediciones hechas con la metodología final, en la RTX 5060 Ti y en la Jetson Orin Nano, están en
+> el [README](../README.md#results) y en [BENCHMARK_METHODOLOGY.md](BENCHMARK_METHODOLOGY.md).
+> Spoiler útil para el paso 5: en esta versión de Ultralytics, `int8=True` deja las capas no
+> cuantizadas en FP32, y en TensorRT 10.3 ni siquiera construye el engine.
+
+> Lab para hacer **tú**, paso a paso y tomando notas. La IA puede ayudarte, pero escalando la ayuda: pregunta → pista → señalar el error → solución, solo al final .
 > Las soluciones de los ejercicios a mano están al final. No las mires antes de intentarlo.
 
 ## Objetivo observable
@@ -141,7 +147,7 @@ Compara con tus predicciones del paso 2. ¿Dónde fallaste y por qué?
   - dejar en FP16 las capas sensibles (precisión mixta);
   - QAT.
 - Si INT8 **no** fue mucho más rápido que FP16, busca por qué. Hipótesis a comprobar: modelo pequeño, capas que no se cuantizan o coste de conversión entre precisiones.
-- Actualiza la tabla sin fuente "FP16 vs FP32" de `06-tensorrt-optimizacion.md` con **tus** números, citando el comando y el commit.
+- Compara tus números con la tabla del README, que usa el protocolo completo.
 
 ## Notas (una entrada por paso)
 
