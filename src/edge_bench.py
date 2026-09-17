@@ -121,6 +121,18 @@ def engine_path(weights: Path, precision: str, host: str, engines_dir: Path) -> 
     return Path(engines_dir) / f"{Path(weights).stem}_{precision}_{host}.engine"
 
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def repo_relative(path) -> str:
+    """Paths inside the repo are recorded relative to it, so records carry no local directories."""
+    p = Path(path)
+    try:
+        return str(p.resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        return str(p)
+
+
 def sha256(path: Path, chunk: int = 1 << 20) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:

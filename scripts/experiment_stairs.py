@@ -25,7 +25,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.edge_bench import EVAL_SETTINGS, accuracy_summary  # noqa: E402
+from src.edge_bench import EVAL_SETTINGS, accuracy_summary, repo_relative  # noqa: E402
 from src.nav_dataset import CLASS_NAMES, read_manifest, write_dataset_yaml  # noqa: E402
 from src.stairs_experiment import (  # noqa: E402
     pseudo_label_quality,
@@ -202,7 +202,7 @@ def cmd_evaluate(_):
         val = accuracy_summary(model.val(data=str(PROJECT_ROOT / "data/nav_combined/dataset.yaml"), split="val",
                                          device=0, plots=False, verbose=False, project=scratch, name=f"val_{arm}",
                                          exist_ok=True, **EVAL_SETTINGS), model.names)
-        results[arm] = {"weights": str(weights), "stairs_test_ap50": test["per_class"]["Stairs"]["map50"],
+        results[arm] = {"weights": repo_relative(weights), "stairs_test_ap50": test["per_class"]["Stairs"]["map50"],
                         "stairs_test_ap50_95": test["per_class"]["Stairs"]["map50_95"], "val": val}
         logger.info(f"arm {arm}: Stairs test AP50 {results[arm]['stairs_test_ap50']:.3f} | val mAP50 {val['map50']:.3f}")
 

@@ -192,9 +192,9 @@ def main():
                 logger.error(f"{weights.stem} {precision}: build failed: {exc}")
                 record = eb.make_record(
                     environment=environment, command=sys.argv,
-                    model={"name": weights.stem, "precision": precision, "weights": str(weights),
+                    model={"name": weights.stem, "precision": precision, "weights": eb.repo_relative(weights),
                            "weights_sha256": eb.sha256(weights)},
-                    protocol={"eval": eb.EVAL_SETTINGS, "dataset": str(args.data)},
+                    protocol={"eval": eb.EVAL_SETTINGS, "dataset": eb.repo_relative(args.data)},
                     latency_ms=None, accuracy=None, memory=None, status="build_failed", error=str(exc)[:2000])
                 logger.info(f"-> {eb.write_record(record, args.out).name}")
                 continue
@@ -212,10 +212,11 @@ def main():
             record = eb.make_record(
                 environment=environment,
                 command=sys.argv,
-                model={"name": weights.stem, "precision": precision, "weights": str(weights),
-                       "weights_sha256": eb.sha256(weights), "artifact_mb": path.stat().st_size / 2**20, **artifact},
+                model={"name": weights.stem, "precision": precision, "weights": eb.repo_relative(weights),
+                       "weights_sha256": eb.sha256(weights), "artifact_mb": path.stat().st_size / 2**20,
+                       **{k: eb.repo_relative(v) if k in ("artifact", "source_onnx") else v for k, v in artifact.items()}},
                 protocol={"eval": eb.EVAL_SETTINGS, "latency_images": len(images), "latency_seed": args.seed,
-                          "latency_conf": LATENCY_CONF, "warmup": args.warmup, "dataset": str(args.data)},
+                          "latency_conf": LATENCY_CONF, "warmup": args.warmup, "dataset": eb.repo_relative(args.data)},
                 latency_ms=latency,
                 accuracy=accuracy,
                 memory={"used_before_mb": memory_before, "used_after_mb": memory_after,

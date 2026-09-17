@@ -39,8 +39,8 @@
     "weights": "models/yolo26n_nav.pt",
     "weights_sha256": "4fc773606c2a15daec891d8d7e92d5a6c2042a6e076c96cb285828b4bd944eac",
     "artifact_mb": 4.218536376953125,
-    "artifact": "/home/robert/Projects/ml/vision-fine-tuning/models/engines/yolo26n_nav_int8_qdq_jetson.engine",
-    "source_onnx": "/home/robert/Projects/ml/vision-fine-tuning/models/qdq/yolo26n_nav_int8_qdq.onnx",
+    "artifact": "models/engines/yolo26n_nav_int8_qdq_jetson.engine",
+    "source_onnx": "models/qdq/yolo26n_nav_int8_qdq.onnx",
     "builder_flags": [
       "INT8",
       "FP16"
@@ -67,7 +67,7 @@
     "latency_seed": 0,
     "latency_conf": 0.25,
     "warmup": 50,
-    "dataset": "/home/robert/Projects/ml/vision-fine-tuning/data/nav_combined/dataset.yaml"
+    "dataset": "data/nav_combined/dataset.yaml"
   },
   "latency_ms": {
     "end_to_end": {

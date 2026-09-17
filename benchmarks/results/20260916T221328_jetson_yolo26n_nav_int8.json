@@ -47,7 +47,7 @@
       "conf": 0.001,
       "iou": 0.7
     },
-    "dataset": "/home/robert/Projects/ml/vision-fine-tuning/data/nav_combined/dataset.yaml"
+    "dataset": "data/nav_combined/dataset.yaml"
   },
   "latency_ms": null,
   "accuracy": null,

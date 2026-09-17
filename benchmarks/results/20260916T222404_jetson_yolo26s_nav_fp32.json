@@ -55,7 +55,7 @@
     "latency_seed": 0,
     "latency_conf": 0.25,
     "warmup": 50,
-    "dataset": "/home/robert/Projects/ml/vision-fine-tuning/data/nav_combined/dataset.yaml"
+    "dataset": "data/nav_combined/dataset.yaml"
   },
   "latency_ms": {
     "end_to_end": {

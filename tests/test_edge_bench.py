@@ -236,3 +236,9 @@ def test_records_default_to_ok_and_failures_show_in_the_table():
 def test_int8_qdq_is_a_known_precision_with_its_own_engine_name(tmp_path):
     assert eb.PRECISIONS == ("fp32", "fp16", "int8", "int8_qdq")
     assert eb.engine_path(Path("m/yolo26n_nav.pt"), "int8_qdq", "jetson", tmp_path).name == "yolo26n_nav_int8_qdq_jetson.engine"
+
+
+def test_repo_relative_strips_the_local_checkout_path(tmp_path):
+    assert eb.repo_relative(eb.REPO_ROOT / "models" / "yolo26n_nav.pt") == "models/yolo26n_nav.pt"
+    assert eb.repo_relative("models/yolo26n_nav.pt") in ("models/yolo26n_nav.pt",)
+    assert eb.repo_relative(tmp_path / "x.engine") == str(tmp_path / "x.engine")  # outside the repo: unchanged

@@ -1,7 +1,7 @@
 {
   "arms": {
     "A": {
-      "weights": "/home/robert/Projects/ml/vision-fine-tuning/models/yolo26n_nav.pt",
+      "weights": "models/yolo26n_nav.pt",
       "stairs_test_ap50": 0.46448044606191236,
       "stairs_test_ap50_95": 0.24037500578902823,
       "val": {
@@ -110,7 +110,7 @@
       }
     },
     "B": {
-      "weights": "/home/robert/Projects/ml/vision-fine-tuning/runs/experiment_stairs/arm_B/weights/best.pt",
+      "weights": "runs/experiment_stairs/arm_B/weights/best.pt",
       "stairs_test_ap50": 0.5434973771343086,
       "stairs_test_ap50_95": 0.3255669592595432,
       "val": {
@@ -219,7 +219,7 @@
       }
     },
     "C": {
-      "weights": "/home/robert/Projects/ml/vision-fine-tuning/runs/experiment_stairs/arm_C/weights/best.pt",
+      "weights": "runs/experiment_stairs/arm_C/weights/best.pt",
       "stairs_test_ap50": 0.5902471211803487,
       "stairs_test_ap50_95": 0.33058552020524484,
       "val": {
