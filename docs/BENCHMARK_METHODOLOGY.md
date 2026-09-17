@@ -119,6 +119,15 @@ only**. Tables are never edited by hand. When a configuration is re-run, the new
 - **Jetson frequency scaling stays on.** The device runs in `MAXN_SUPER` (recorded) without
   `jetson_clocks`, so CPU/GPU frequencies can still scale down between bursts. That is the
   realistic deployment setting, but it can widen the latency tail.
+- **TensorRT bugs shape what can be measured, and failures are recorded.** A build that fails is
+  written as a `build_failed` record with TensorRT's own error:
+  - Ultralytics' implicit INT8 does not build on **TensorRT 10.3** (Jetson): internal
+    `checkSanity::checkLinks` assertion during calibration.
+  - The explicit Q/DQ INT8 ONNX does not build on **TensorRT 10.16** with the RTX 5060 Ti (Blackwell,
+    sm_120): `MyelinCheckException` in Myelin's code generator, a known issue on Blackwell
+    ([NVIDIA/TensorRT#4743](https://github.com/NVIDIA/TensorRT/issues/4743)).
+  - The same Q/DQ ONNX builds and runs on the Jetson. Neither bug was worked around; the published
+    decision (FP16) would not change.
 - **Software versions.** Everything the project controls is identical on every device: dataset,
   weights, benchmark code (git commit) and **Ultralytics 8.4.14** (`uv.lock` on x86, the pinned
   `ultralytics/ultralytics:8.4.14-jetson-jetpack6` image on Jetson). TensorRT, CUDA and the driver

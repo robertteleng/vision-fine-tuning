@@ -99,7 +99,18 @@ def build_engine(qdq_onnx: Path, weights: Path, engines_dir: Path, workspace_gb:
     if info["reused"]:
         return info
 
-    logger = trt.Logger(trt.Logger.WARNING)
+    class ErrorLogger(trt.ILogger):
+        """Keeps TensorRT's error messages so a failed build records why it failed."""
+
+        def __init__(self):
+            trt.ILogger.__init__(self)
+            self.errors: list[str] = []
+
+        def log(self, severity, msg):
+            if severity in (trt.ILogger.INTERNAL_ERROR, trt.ILogger.ERROR):
+                self.errors.append(msg)
+
+    logger = ErrorLogger()
     builder = trt.Builder(logger)
     network = builder.create_network(0)
     parser = trt.OnnxParser(network, logger)
@@ -114,7 +125,7 @@ def build_engine(qdq_onnx: Path, weights: Path, engines_dir: Path, workspace_gb:
     start = time.perf_counter()
     serialized = builder.build_serialized_network(network, config)
     if serialized is None:
-        raise RuntimeError("TensorRT engine build failed")
+        raise RuntimeError(f"TensorRT {trt.__version__} engine build failed: " + " | ".join(logger.errors[-3:]))
     info["export_seconds"] = time.perf_counter() - start
 
     meta = {p.key: p.value for p in onnx.load(str(qdq_onnx), load_external_data=False).metadata_props}
