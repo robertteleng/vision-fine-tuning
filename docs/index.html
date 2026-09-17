@@ -824,135 +824,108 @@ function pipelineSvg(labels){
 /* ===== Glossary: what this repo taught me =====
    Each concept: group, phase id where it shows up, ES/EN term + one-line definition. */
 const CONCEPT_GROUPS = {
-  datos:    {es:'Datos y anotación', en:'Data and annotation'},
-  train:    {es:'Entrenamiento y evaluación', en:'Training and evaluation'},
-  medida:   {es:'Inferencia y medida', en:'Inference and measurement'},
-  soft:     {es:'Ingeniería de software', en:'Software engineering'},
-  metodo:   {es:'Método', en:'Method'}
+  datos:   {es:'Datos y anotación', en:'Data and annotation'},
+  train:   {es:'Entrenamiento y evaluación', en:'Training and evaluation'},
+  quant:   {es:'Precisión y cuantización', en:'Precision and quantization'},
+  edge:    {es:'Edge y medida', en:'Edge and measurement'},
+  metodo:  {es:'Método', en:'Method'}
 };
 const CONCEPTS = [
   // Datos y anotación
-  {id:'template-matching', g:'datos', phase:'origen',
-   es:['Template matching','Deslizar una imagen patrón sobre otra y puntuar el parecido en cada posición. Barato, pero frágil ante cambios de aspecto (pilares invertidos).'],
-   en:['Template matching','Slide a pattern image over another and score similarity at each position. Cheap, but brittle when the look changes (inverted pillars).']},
-  {id:'nms', g:'datos', phase:'origen',
-   es:['NMS (non-maximum suppression)','Entre cajas que se solapan por encima de un IoU, quedarse con la de mayor puntuación. YOLO26 se anuncia como end-to-end, sin NMS en inferencia.'],
-   en:['NMS (non-maximum suppression)','Among boxes overlapping above an IoU threshold, keep the highest-scoring one. YOLO26 is presented as end-to-end, with no NMS at inference.']},
-  {id:'umbral', g:'datos', phase:'origen',
-   es:['Umbral de confianza','Subirlo quita falsos positivos y también detecciones reales. Se elige con la curva precision-recall, no a ojo.'],
-   en:['Confidence threshold','Raising it removes false positives and real detections too. Pick it from the precision-recall curve, not by eye.']},
-  {id:'fuga', g:'datos', phase:'origen',
-   es:['Fuga de datos train/val','Imágenes casi idénticas en entrenamiento y validación inflan la métrica. Con vídeo: dividir por bloques o escenas, nunca frame a frame.'],
-   en:['Train/val leakage','Near-identical images in training and validation inflate the metric. With video: split by blocks or scenes, never frame by frame.']},
-  {id:'zero-shot', g:'datos', phase:'zeroshot',
-   es:['Detección zero-shot','Detectar clases no vistas en entrenamiento a partir de texto (Grounding DINO, YOLO-World). Útil para proponer etiquetas, no para fiarse sin revisar.'],
-   en:['Zero-shot detection','Detect classes unseen in training from a text prompt (Grounding DINO, YOLO-World). Useful to propose labels, not to trust unreviewed.']},
-  {id:'yolo-format', g:'datos', phase:'zeroshot',
-   es:['Formato de etiqueta YOLO','Una línea por caja: clase cx cy w h, normalizados entre 0 y 1. Un error de normalización no da error: enseña basura.'],
-   en:['YOLO label format','One line per box: class cx cy w h, normalized to 0–1. A normalization bug throws no error: it teaches garbage.']},
-  {id:'gold-set', g:'datos', phase:'zeroshot',
-   es:['Gold set','Pequeño conjunto etiquetado a mano para medir la calidad de un anotador automático (precisión y recall).'],
-   en:['Gold set','A small hand-labeled set used to measure an automatic annotator\'s quality (precision and recall).']},
-  {id:'pseudo', g:'datos', phase:'zeroshot',
-   es:['Pseudo-etiquetas','Etiquetas generadas por otro modelo. El detector hereda sus errores sistemáticos.'],
-   en:['Pseudo-labels','Labels produced by another model. The detector inherits its systematic errors.']},
-  {id:'missing-labels', g:'datos', phase:'dataset',
-   es:['Etiquetas ausentes','Un objeto real sin caja cuenta como fondo, y el modelo aprende a suprimirlo.'],
-   en:['Missing labels','A real object without a box counts as background, and the model learns to suppress it.']},
-  // Entrenamiento
-  {id:'head', g:'train', phase:'dataset',
-   es:['Cabeza de detección','Última parte del modelo, con una salida por clase. Cambiar el número de clases la sustituye entera.'],
-   en:['Detection head','The model\'s last part, with one output per class. Changing the class count replaces it entirely.']},
-  {id:'freeze', g:'train', phase:'dataset',
-   es:['Congelar el backbone (freeze)','No actualizar las primeras capas al entrenar. Conserva features, no clases.'],
-   en:['Freezing the backbone','Not updating the early layers during training. Keeps features, not classes.']},
-  {id:'forgetting', g:'train', phase:'dataset',
-   es:['Olvido catastrófico','Al entrenar solo con clases nuevas, el modelo pierde las que sabía.'],
-   en:['Catastrophic forgetting','Training only on new classes makes the model lose the ones it knew.']},
-  {id:'remap', g:'train', phase:'dataset',
-   es:['Dataset combinado y remapeo de IDs','Unir fuentes en un solo espacio de clases desplazando IDs (custom 0–5 → 18–23) para no chocar.'],
-   en:['Combined dataset and ID remap','Merge sources into one class space by shifting IDs (custom 0–5 → 18–23) so they don\'t collide.']},
-  {id:'map', g:'train', phase:'dataset',
-   es:['mAP50 vs mAP50-95','mAP50: precisión media con IoU ≥ 0.5. mAP50-95: promedio con IoU de 0.50 a 0.95; exige cajas más ajustadas.'],
-   en:['mAP50 vs mAP50-95','mAP50: mean average precision at IoU ≥ 0.5. mAP50-95: averaged over IoU 0.50 to 0.95; demands tighter boxes.']},
-  {id:'small-sample', g:'train', phase:'dataset',
-   es:['Métrica con pocas muestras','Con 7 imágenes de validación el número es ruido. Antes de concluir, contar cuántos ejemplos hay detrás.'],
-   en:['Metric on few samples','With 7 validation images the number is noise. Before concluding, count the examples behind it.']},
-  {id:'aggregate', g:'train', phase:'origen',
-   es:['Media que esconde subgrupos','Una métrica global puede no moverse aunque mejore (o empeore) el caso crítico. Medirlo por separado.'],
-   en:['Averages hide subgroups','A global metric may not move while the critical case improves (or worsens). Measure it separately.']},
-  {id:'patience', g:'train', phase:'dataset',
-   es:['Early stopping (patience)','Parar si la validación no mejora en N épocas. Evita épocas desperdiciadas (37 de 50).'],
-   en:['Early stopping (patience)','Stop when validation hasn\'t improved for N epochs. Avoids wasted epochs (best was 37 of 50).']},
-  {id:'autobatch', g:'train', phase:'framework',
-   es:['AutoBatch (batch=-1)','Ultralytics elige el batch que cabe en una fracción de la VRAM. Cómodo, pero cambia entre máquinas.'],
-   en:['AutoBatch (batch=-1)','Ultralytics picks the batch that fits a fraction of VRAM. Convenient, but it varies across machines.']},
-  // Medida
-  {id:'tensorrt', g:'medida', phase:'velocidad',
-   es:['TensorRT y engine','Compilador de NVIDIA: fusiona capas, elige kernels y usa FP16. Produce un .engine para una GPU y versión concretas.'],
-   en:['TensorRT and engine','NVIDIA\'s compiler: fuses layers, picks kernels, uses FP16. Produces an .engine for one GPU and version.']},
-  {id:'fp16', g:'medida', phase:'velocidad',
-   es:['FP16','Números de 16 bits en vez de 32. Más rápido y menos memoria; la pérdida de precisión hay que medirla, no suponerla.'],
-   en:['FP16','16-bit numbers instead of 32. Faster and lighter; the accuracy loss must be measured, not assumed.']},
-  {id:'portable', g:'medida', phase:'metodologia',
-   es:['Engine no portable','Se versiona el .pt y cada dispositivo compila su propio .engine.'],
-   en:['Non-portable engine','Version the .pt; each device builds its own .engine.']},
-  {id:'async', g:'medida', phase:'velocidad',
-   es:['GPU asíncrona y synchronize()','Python vuelve cuando el trabajo está encolado. Sin sincronizar, el cronómetro mide la cola, no la inferencia.'],
-   en:['Async GPU and synchronize()','Python returns once work is queued. Without syncing, the timer measures the queue, not inference.']},
-  {id:'warmup', g:'medida', phase:'velocidad',
-   es:['Warmup','Descartar las primeras inferencias: incluyen carga del engine, memoria y ajuste de kernels.'],
-   en:['Warmup','Discard the first inferences: they include engine loading, memory allocation and kernel tuning.']},
-  {id:'p95', g:'medida', phase:'velocidad',
-   es:['Media vs p95/p99','La media describe el frame típico; el p95 describe el lento, que es el que importa en seguridad.'],
-   en:['Mean vs p95/p99','The mean describes the typical frame; p95 describes the slow one, which is what matters for safety.']},
-  {id:'synthetic', g:'medida', phase:'velocidad',
-   es:['Benchmark sintético vs real','Una imagen de ruido no tiene decodificación ni objetos: subestima el tiempo real por frame.'],
-   en:['Synthetic vs real benchmark','A noise image has no decoding and no objects: it underestimates real per-frame time.']},
-  {id:'repro', g:'medida', phase:'mirar-atras',
-   es:['Número reproducible','Cada métrica va con su comando, su commit y su hardware. Si no, no se puede defender.'],
-   en:['Reproducible number','Every metric ships with its command, commit and hardware. Otherwise it can\'t be defended.']},
-  {id:'int8', g:'medida', phase:'velocidad', pending:true,
-   es:['INT8, PTQ y calibración','Pendiente: se aprende en el lab 07 (FP32 → FP16 → INT8 en la 5060 Ti y en el Jetson).'],
-   en:['INT8, PTQ and calibration','Pending: learned in lab 07 (FP32 → FP16 → INT8 on the 5060 Ti and the Jetson).']},
-  // Software
-  {id:'layers', g:'soft', phase:'framework',
-   es:['Separar interfaz y lógica','UI y CLI llaman a la misma lógica en src/. Una sola implementación, testeable sin arrancar la interfaz.'],
-   en:['Separate UI from logic','UI and CLI call the same logic in src/. One implementation, testable without launching the UI.']},
-  {id:'broad-except', g:'soft', phase:'framework',
-   es:['except amplio','Convierte cualquier error en un resultado que parece válido. Capturar solo lo esperado, o al menos registrar.'],
-   en:['Broad except','Turns any error into a valid-looking result. Catch only what you expect, or at least log it.']},
-  {id:'extras', g:'soft', phase:'framework',
-   es:['Extras de dependencias (uv)','Dependencias pesadas opcionales (uv sync --extra annotation). El extra de tests debe incluir lo que los tests importan.'],
-   en:['Dependency extras (uv)','Optional heavy dependencies (uv sync --extra annotation). The test extra must include what tests import.']},
-  {id:'collection', g:'soft', phase:'metodologia',
-   es:['Error de recolección en pytest','Un import fallido al recolectar aborta toda la ejecución y oculta los tests que pasan.'],
-   en:['pytest collection error','A failing import during collection aborts the whole run and hides the passing tests.']},
-  {id:'skip-fail', g:'soft', phase:'metodologia',
-   es:['skip vs fail','Saltar si falta el dato local; fallar si existe pero está incompleto. En CI hace falta un fixture para que corra.'],
-   en:['skip vs fail','Skip when local data is missing; fail when it exists but is incomplete. CI needs a fixture for it to run.']},
-  {id:'artifacts', g:'soft', phase:'metodologia',
-   es:['Versionar artefactos no regenerables','Guardar lo que costaría reentrenar (.pt); no lo que se regenera en cada máquina (.engine).'],
-   en:['Versioning non-regenerable artifacts','Keep what would cost a retrain (.pt); not what each machine regenerates (.engine).']},
-  {id:'silent', g:'soft', phase:'mirar-atras',
-   es:['Errores silenciosos','Los caros no fallan: dan un resultado equivocado que parece correcto (remapeo, split, except).'],
-   en:['Silent errors','The expensive ones don\'t crash: they return a wrong result that looks right (remap, split, except).']},
+  {id:'olvido', g:'datos', phase:'dataset',
+   es:['Olvido catastrófico','Al hacer fine-tuning con clases nuevas, YOLO sustituye la cabeza de detección y olvida las clases que no están en el nuevo dataset. Por eso todas las clases van en un solo dataset.'],
+   en:['Catastrophic forgetting','Fine-tuning on new classes replaces the YOLO detection head, so classes missing from the new dataset are forgotten. That is why every class goes into one dataset.']},
+  {id:'combinado', g:'datos', phase:'dataset',
+   es:['Dataset combinado','Un subconjunto de COCO con las clases útiles más las clases nuevas de otra fuente, con IDs que no se solapan (0-17 COCO, 18-23 Open Images).'],
+   en:['Combined dataset','A COCO subset with the useful classes plus the new classes from another source, with non-overlapping IDs (0-17 COCO, 18-23 Open Images).']},
+  {id:'manifiesto', g:'datos', phase:'dataset',
+   es:['Manifiesto de datos','Lista versionada de IDs exactos de imágenes. Reproduce el dataset aunque la regla de selección original no se pueda reconstruir.'],
+   en:['Data manifest','A versioned list of exact image IDs. It reproduces the dataset even when the original selection rule cannot be recovered.']},
+  {id:'parciales', g:'datos', phase:'dataset',
+   es:['Etiquetas parciales','Un objeto real sin caja cuenta como fondo. Al combinar fuentes, cada una deja sin etiquetar las clases de la otra.'],
+   en:['Partial labels','A real object without a box counts as background. When sources are combined, each leaves the other\'s classes unlabelled.']},
+  {id:'zero-shot', g:'datos', phase:'stairs',
+   es:['Detección zero-shot','Detectar a partir de un texto clases que el modelo no vio etiquetadas (Grounding DINO). Sirve para proponer etiquetas; su calidad se mide contra etiquetas humanas.'],
+   en:['Zero-shot detection','Detecting from a text prompt classes the model never saw labelled (Grounding DINO). Good for proposing labels; its quality is measured against human labels.']},
+  {id:'pseudo', g:'datos', phase:'stairs',
+   es:['Pseudo-etiquetas','Etiquetas generadas por otro modelo. El detector hereda sus falsos positivos y sus omisiones.'],
+   en:['Pseudo-labels','Labels produced by another model. The detector inherits its false positives and misses.']},
+  // Entrenamiento y evaluación
+  {id:'map', g:'train', phase:'entrenar',
+   es:['mAP50 frente a mAP50-95','mAP50 cuenta como acierto una caja con IoU ≥ 0,5; mAP50-95 promedia umbrales de 0,5 a 0,95 y premia cajas ajustadas.'],
+   en:['mAP50 vs mAP50-95','mAP50 counts a box as correct at IoU ≥ 0.5; mAP50-95 averages thresholds from 0.5 to 0.95 and rewards tight boxes.']},
+  {id:'por-clase', g:'train', phase:'fp16-int8',
+   es:['Métrica por clase','El mAP global puede no moverse mientras una clase crítica se hunde. Se decide mirando las clases que importan.'],
+   en:['Per-class metrics','Global mAP can stay flat while a critical class collapses. Decisions look at the classes that matter.']},
+  {id:'ruido-clase', g:'train', phase:'entrenar',
+   es:['Ruido de clases pequeñas','Con 45 instancias de validación, unas centésimas de AP son ruido. Hace falta más test antes de concluir.'],
+   en:['Small-class noise','With 45 validation instances, a few hundredths of AP are noise. More test data is needed before concluding.']},
+  {id:'backbone', g:'train', phase:'entrenar',
+   es:['Backbone, neck y head','El backbone extrae características, el neck las combina a varias escalas y el head predice cajas y clases. El fine-tuning aquí reentrena todo, sin congelar.'],
+   en:['Backbone, neck and head','The backbone extracts features, the neck mixes them across scales and the head predicts boxes and classes. Fine-tuning here retrains everything, nothing frozen.']},
+  {id:'nms-free', g:'train', phase:'entrenar',
+   es:['Detección sin NMS','YOLO26 es end-to-end: no necesita non-maximum suppression después, lo que simplifica el export y quita post-proceso en edge.'],
+   en:['NMS-free detection','YOLO26 is end-to-end: no non-maximum suppression afterwards, which simplifies export and removes post-processing on edge.']},
+  {id:'metodos-ft', g:'train', phase:'entrenar',
+   es:['Métodos de fine-tuning','Todo el modelo, backbone congelado, descongelado progresivo, distilación (s enseña a n), QAT o adaptadores como LoRA (más en transformers).'],
+   en:['Fine-tuning methods','Full model, frozen backbone, progressive unfreezing, distillation (s teaches n), QAT, or adapters like LoRA (mostly in transformers).']},
+  // Precisión y cuantización
+  {id:'fp16', g:'quant', phase:'fp16-int8',
+   es:['FP32, FP16 e INT8','32 o 16 bits en coma flotante, o enteros de 8 bits. Menos bits: menos memoria y cálculo más rápido si hay kernels para ello, a cambio de rango y resolución.'],
+   en:['FP32, FP16 and INT8','32- or 16-bit floating point, or 8-bit integers. Fewer bits: less memory and faster compute when kernels exist, at the cost of range and resolution.']},
+  {id:'ptq-qat', g:'quant', phase:'fp16-int8',
+   es:['PTQ frente a QAT','PTQ cuantiza un modelo ya entrenado usando datos de calibración. QAT simula INT8 durante unas épocas extra para que la red compense el redondeo.'],
+   en:['PTQ vs QAT','PTQ quantizes a trained model using calibration data. QAT simulates INT8 during extra epochs so the network compensates for rounding.']},
+  {id:'calibracion', g:'quant', phase:'fp16-int8',
+   es:['Calibración','Pasar imágenes reales para medir el rango de cada activación y fijar la escala INT8. Calibrar con el set de evaluación contamina la medida.'],
+   en:['Calibration','Running real images to measure each activation\'s range and set the INT8 scale. Calibrating on the evaluation set contaminates the measurement.']},
+  {id:'minmax', g:'quant', phase:'fp16-int8',
+   es:['MinMax frente a Entropy','MinMax usa el rango observado completo: un valor extremo quita resolución al resto. Entropy recorta el rango para perder menos información.'],
+   en:['MinMax vs Entropy','MinMax uses the full observed range: one outlier costs everyone else resolution. Entropy clips the range to lose less information.']},
+  {id:'implicita', g:'quant', phase:'fp16-int8',
+   es:['Cuantización implícita frente a explícita','Implícita: TensorRT calibra al construir el engine (obsoleta desde TensorRT 10). Explícita: las escalas van en el ONNX como nodos Q/DQ.'],
+   en:['Implicit vs explicit quantization','Implicit: TensorRT calibrates while building the engine (deprecated since TensorRT 10). Explicit: the scales live in the ONNX as Q/DQ nodes.']},
+  {id:'fallback', g:'quant', phase:'fp16-int8',
+   es:['Precisión de respaldo','Las capas sin kernel INT8 corren en otra precisión. Si es FP32 en vez de FP16, INT8 puede salir más lento que FP16.'],
+   en:['Fallback precision','Layers without an INT8 kernel run in another precision. If that is FP32 instead of FP16, INT8 can end up slower than FP16.']},
+  // Edge y medida
+  {id:'engine', g:'edge', phase:'metodologia',
+   es:['Engine de TensorRT','Plan compilado para una GPU y una versión de TensorRT concretas. No es portable: se construye en el dispositivo que lo ejecuta.'],
+   en:['TensorRT engine','A plan compiled for one GPU and one TensorRT version. Not portable: it is built on the device that runs it.']},
+  {id:'percentiles', g:'edge', phase:'metodologia',
+   es:['Media frente a p95/p99','La media esconde los picos; en tiempo real importa la cola. Un p99 de 172 ms con media de 35 ms es un sistema que a veces se congela.'],
+   en:['Mean vs p95/p99','The mean hides spikes; real time lives in the tail. A 172 ms p99 with a 35 ms mean is a system that sometimes freezes.']},
+  {id:'warmup-sync', g:'edge', phase:'metodologia',
+   es:['Warm-up y sincronización','Las primeras inferencias incluyen inicialización. Y la GPU trabaja en asíncrono: sin <code>torch.cuda.synchronize()</code> el cronómetro para antes de tiempo.'],
+   en:['Warm-up and synchronization','The first inferences include initialization. And the GPU runs asynchronously: without <code>torch.cuda.synchronize()</code> the timer stops too early.']},
+  {id:'cuello', g:'edge', phase:'jetson',
+   es:['Cuello de botella','El recurso que se agota primero manda. En el Jetson es la CPU: un engine más rápido no se nota extremo a extremo.'],
+   en:['Bottleneck','The first resource to run out sets the pace. On the Jetson it is the CPU: a faster engine does not show end to end.']},
+  {id:'unificada', g:'edge', phase:'jetson',
+   es:['Memoria unificada','En el Jetson CPU y GPU comparten 7,6 GB. No hay VRAM que reservar: lo que usa la GPU se lo quita al sistema.'],
+   en:['Unified memory','On the Jetson, CPU and GPU share 7.6 GB. There is no VRAM to reserve: what the GPU uses, the system loses.']},
+  {id:'engine-solo', g:'edge', phase:'jetson',
+   es:['Latencia del engine solo','Medir la red sin pre/post-proceso ni Python separa lo que cuesta el modelo de lo que cuesta el código alrededor.'],
+   en:['Engine-only latency','Timing the network without pre/post-processing or Python separates what the model costs from what the surrounding code costs.']},
   // Método
   {id:'polya', g:'metodo', phase:'resumen',
    es:['Los 5 pasos','Entender, simular con números, escribir, medir y mirar atrás. Adaptado de Pólya (1945).'],
    en:['The 5 steps','Understand, simulate with numbers, write, measure, look back. Adapted from Pólya (1945).']},
-  {id:'criterio', g:'metodo', phase:'mirar-atras',
-   es:['Criterio antes de medir','Decidir qué resultado acepto antes de ver los números, para no ajustarlo a lo que salga.'],
-   en:['Criterion before measuring','Decide what result I\'ll accept before seeing the numbers, so I don\'t fit it to what comes out.']},
-  {id:'eval-first', g:'metodo', phase:'mirar-atras',
-   es:['Evaluación antes que modelo','Primero un split sin fuga y un test del dominio real; después entrenar.'],
-   en:['Evaluation before model','First a leak-free split and a real-domain test set; then train.']}
+  {id:'prerregistro', g:'metodo', phase:'stairs',
+   es:['Prerregistro','Escribir diseño y criterio de decisión, y hacer commit, antes de ver resultados. El historial de git lo demuestra.'],
+   en:['Pre-registration','Writing the design and decision criterion, and committing it, before seeing results. The git history proves it.']},
+  {id:'reproducible', g:'metodo', phase:'metodologia',
+   es:['Número con ficha','Cada cifra publicada sale de un JSON con hardware, versiones, commit y comando. Las tablas se generan; nunca se escriben a mano.'],
+   en:['Numbers with provenance','Every published figure comes from a JSON with hardware, versions, commit and command. Tables are generated, never typed.']},
+  {id:'fallos', g:'metodo', phase:'fp16-int8',
+   es:['Registrar los fallos','Un engine que no se construye también es un resultado: se guarda con el error real y aparece en la tabla.'],
+   en:['Recording failures','An engine that fails to build is a result too: it is stored with the real error and shows in the table.']}
 ];
 
 function conceptsHtml(lang){
   const L = lang === 'es'
-    ? {intro:'Todo lo que me enseñó este repo, en una línea por concepto. Marca los que sabrías explicar sin mirar: la marca se guarda en este navegador.', known:'sé explicarlo', see:'ver fase', pending:'pendiente', count:(a,b)=>`${a} de ${b} que sé explicar`}
-    : {intro:'Everything this repo taught me, one line per concept. Tick the ones you could explain without looking: ticks are saved in this browser.', known:'I can explain it', see:'see phase', pending:'pending', count:(a,b)=>`${a} of ${b} I can explain`};
+    ? {intro:'Todo lo que me enseñó este repo, en una línea por concepto. Marca los que sabrías explicar sin mirar: la marca se guarda en este navegador.', known:'sé explicarlo', see:'ver fase', pending:'pendiente'}
+    : {intro:'Everything this repo taught me, one line per concept. Tick the ones you could explain without looking: ticks are saved in this browser.', known:'I can explain it', see:'see phase', pending:'pending'};
   const groups = Object.keys(CONCEPT_GROUPS).map(g => {
     const items = CONCEPTS.filter(c => c.g === g).map(c => {
       const [t, d] = c[lang];
@@ -970,13 +943,39 @@ function conceptsHtml(lang){
 }
 function conceptCountLabel(lang, a, b){ return lang === 'es' ? `${a} de ${b} que sé explicar` : `${a} of ${b} I can explain`; }
 
+/* ===== Language-neutral figures ===== */
+function latencyBarSvg(l){
+  // Jetson nano FP16, measured (benchmarks/results): total 22.89 ms
+  const segs = [[l.pre,'7.1','s-box'],[l.engine,'4.1','s-box-ok'],[l.wrap,'8.7','s-box'],[l.post,'2.1','s-box'],[l.other,'1.0','s-box']];
+  const widths = [7.07, 4.06, 8.74, 2.07, 0.95];
+  let x = 20;
+  return segs.map((s, i) => {
+    const w = widths[i] * 34;
+    const out = `<rect class="${s[2]}" x="${x}" y="30" width="${w}" height="46" rx="4"/>
+      <text class="s-t" x="${x + w/2}" y="58" text-anchor="middle">${s[1]}</text>
+      <text class="s-d" x="${x + w/2}" y="${i % 2 ? 100 : 20}" text-anchor="middle">${s[0]}</text>`;
+    x += w;
+    return out;
+  }).join('') + `<text class="s-d" x="${x + 8}" y="58">= 22.9 ms</text>`;
+}
+function stairsBarsSvg(arms){
+  // Stairs AP50 on the 120-image test set, measured. Axis starts at 0 (no truncation).
+  const vals = [0.464, 0.543, 0.590];
+  return vals.map((v, i) => {
+    const h = v * 240, x = 60 + i * 170, y = 160 - h;
+    return `<rect class="${i === 0 ? 's-box' : 's-box-ok'}" x="${x}" y="${y}" width="110" height="${h}" rx="4"/>
+      <text class="s-t" x="${x + 55}" y="${y - 6}" text-anchor="middle">${v.toFixed(3)}</text>
+      <text class="s-d" x="${x + 55}" y="178" text-anchor="middle">${arms[i]}</text>`;
+  }).join('') + '<line class="s-line" x1="40" y1="160" x2="580" y2="160"/>';
+}
+
 const PAGE = {
   slug: 'vision-fine-tuning',
   ui: {
     es: {
       docTitle: 'Cómo se construyó Vision Fine-Tuning',
       railAria: 'Fases del proyecto', railEyebrow: 'vision-fine-tuning · bitácora', railTitle: 'Cómo se construyó',
-      railFoot: 'fuente: git log · docs/ · código<br>dic 2025 → sep 2026 · 1 autor',
+      railFoot: 'fuente: git log · benchmarks/ · docs/<br>dic 2025 → sep 2026 · 1 autor',
       links: [{href:'https://github.com/robertteleng/vision-fine-tuning', label:'↗ código en GitHub'}],
       prev: '← Anterior', next: 'Siguiente →', end: 'Fin ✓',
       phase: 'Fase', summaryKicker: 'Resumen', progress: (a, b) => a === 0 ? `Resumen · ${b} fases` : `Fase ${a} de ${b}`,
@@ -989,7 +988,7 @@ const PAGE = {
     en: {
       docTitle: 'How Vision Fine-Tuning was built',
       railAria: 'Project phases', railEyebrow: 'vision-fine-tuning · build log', railTitle: 'How it was built',
-      railFoot: 'source: git log · docs/ · code<br>Dec 2025 → Sep 2026 · 1 author',
+      railFoot: 'source: git log · benchmarks/ · docs/<br>Dec 2025 → Sep 2026 · 1 author',
       links: [{href:'https://github.com/robertteleng/vision-fine-tuning', label:'↗ code on GitHub'}],
       prev: '← Previous', next: 'Next →', end: 'End ✓',
       phase: 'Phase', summaryKicker: 'Summary', progress: (a, b) => a === 0 ? `Summary · ${b} phases` : `Phase ${a} of ${b}`,
@@ -1003,488 +1002,244 @@ const PAGE = {
   map: {
     es: {
       nodes: [
-        {id:'datos', t:'Datos', d:'vídeo · COCO · OI V7'},
-        {id:'anotar', t:'Anotar', d:'template · G-DINO'},
-        {id:'dataset', t:'Dataset', d:'YOLO · split'},
-        {id:'entrenar', t:'Entrenar', d:'YOLO26 fine-tune'},
+        {id:'datos', t:'Datos', d:'COCO · Open Images'},
+        {id:'anotar', t:'Anotar', d:'Grounding DINO'},
+        {id:'dataset', t:'Dataset', d:'24 clases · manifiesto'},
+        {id:'entrenar', t:'Entrenar', d:'YOLO26 n / s'},
         {id:'evaluar', t:'Evaluar', d:'mAP por clase'},
-        {id:'exportar', t:'Exportar', d:'TensorRT FP16'},
-        {id:'usar', t:'Usar', d:'AriaGuard'}
+        {id:'exportar', t:'Exportar', d:'TensorRT FP16/INT8'},
+        {id:'desplegar', t:'Desplegar', d:'RTX · Jetson'}
       ],
       bands: [
-        {id:'framework', t:'Framework', d:'src/ · Gradio · CLI · uv'},
-        {id:'verificar', t:'Verificar', d:'pytest · benchmark'}
+        {id:'medir', t:'Medir', d:'benchmark · JSON · metodología'},
+        {id:'verificar', t:'Verificar', d:'pytest · prerregistro'}
       ]
     },
     en: {
       nodes: [
-        {id:'datos', t:'Data', d:'video · COCO · OI V7'},
-        {id:'anotar', t:'Annotate', d:'template · G-DINO'},
-        {id:'dataset', t:'Dataset', d:'YOLO · split'},
-        {id:'entrenar', t:'Train', d:'YOLO26 fine-tune'},
+        {id:'datos', t:'Data', d:'COCO · Open Images'},
+        {id:'anotar', t:'Annotate', d:'Grounding DINO'},
+        {id:'dataset', t:'Dataset', d:'24 classes · manifest'},
+        {id:'entrenar', t:'Train', d:'YOLO26 n / s'},
         {id:'evaluar', t:'Evaluate', d:'per-class mAP'},
-        {id:'exportar', t:'Export', d:'TensorRT FP16'},
-        {id:'usar', t:'Use', d:'AriaGuard'}
+        {id:'exportar', t:'Export', d:'TensorRT FP16/INT8'},
+        {id:'desplegar', t:'Deploy', d:'RTX · Jetson'}
       ],
       bands: [
-        {id:'framework', t:'Framework', d:'src/ · Gradio · CLI · uv'},
-        {id:'verificar', t:'Verify', d:'pytest · benchmark'}
+        {id:'medir', t:'Measure', d:'benchmark · JSON · methodology'},
+        {id:'verificar', t:'Verify', d:'pytest · pre-registration'}
       ]
     }
   },
   steps: {}
 };
 
-PAGE.steps.es = [
-/* ───────────────────────── 0 · RESUMEN ───────────────────────── */
-{
-  id: 'resumen', label: 'El proyecto en 2 minutos', date: 'dic 2025 → sep 2026', focus: 'all',
-  title: 'Un detector de obstáculos de 24 clases, y el framework para entrenarlo',
-  sub: 'Esta página cuenta cómo se construyó el proyecto, fase a fase, con el código y las métricas reales, incluidas las que salieron mal. Sirve para entenderlo, reaprenderlo y saber explicarlo.',
-  intro: `
-  <div class="pitch">
-    <span class="lbl">Pitch</span>
-    <p><strong>Problema.</strong> Una persona ciega que camina con unas gafas con cámara necesita que el sistema detecte puertas, escaleras, farolas o sillas de ruedas. Los modelos preentrenados en COCO no conocen esas clases.</p>
-    <p><strong>Qué hice.</strong> Un framework en Python que cubre el ciclo completo: auto-anotar imágenes con texto (Grounding DINO), entrenar YOLO26, evaluar, exportar a TensorRT y medir la velocidad. Con él entrené <code>yolo26s_nav</code>, un modelo de 24 clases que usa AriaGuard.</p>
-    <p><strong>Resultado honesto.</strong> Va rápido (451 FPS en TensorRT FP16), pero la precisión es modesta: mAP50 de 0.47. Las clases más importantes para el producto, como las escaleras, son de las más débiles. El proyecto lo he hecho solo: 133 commits entre diciembre de 2025 y septiembre de 2026.</p>
-  </div>
-  ${stats([
-    {num:'0.470', lbl:'mAP50 · 24 clases'},
-    {num:'0.311', lbl:'mAP50-95'},
-    {num:'451', lbl:'FPS · TensorRT FP16', good:true},
-    {num:'14K', lbl:'imágenes de entrenamiento'}
-  ])}
-  ${explain('Cómo leer esta web: el método de 5 pasos', `<p>Cada fase se cuenta con el mismo método, una adaptación de <em>How to Solve It</em> de Pólya (1945):</p>`)}
-  ${fig(`
-    ${[['1 · Entender','qué problema es'],['2 · Simular','un caso con números'],['3 · Escribir','código y decisión'],['4 · Medir','qué salió y cómo'],['5 · Mirar atrás','qué cambiaría']].map(([t,d],i)=>{
+const POLYA_FIG = (labels, caption, loop) => fig(`
+    ${labels.map(([t,d],i)=>{
       const x = 16 + i*186;
       return `<rect class="s-box" x="${x}" y="20" width="160" height="56" rx="7"/>
       <text class="s-t" x="${x+80}" y="44" text-anchor="middle">${t}</text>
       <text class="s-d" x="${x+80}" y="62" text-anchor="middle">${d}</text>
       ${i<4?`<line class="s-line" x1="${x+160}" y1="48" x2="${x+183}" y2="48" marker-end="url(#arrow)"/>`:''}`;}).join('')}
     <path class="s-line" d="M 840 76 C 840 118, 96 118, 96 80" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
-    <text class="s-d" x="468" y="112" text-anchor="middle">lo aprendido alimenta la siguiente vuelta</text>
-  `, '0 0 950 126', 'Pólya tenía cuatro pasos. «Concebir un plan» se convierte en simular un caso concreto, y «examinar la solución» se parte en medir y mirar atrás, porque el código se puede ejecutar y contradecirte.', 'Flujo de cinco pasos: entender, simular, escribir, medir, mirar atrás, con retorno al inicio')}
+    <text class="s-d" x="468" y="112" text-anchor="middle">${loop}</text>
+  `, '0 0 950 126', caption, labels.map(l => l[0]).join(', '));
+
+PAGE.steps.es = [
+/* 0 · RESUMEN */
+{
+  id: 'resumen', label: 'El proyecto en 2 minutos', date: 'dic 2025 → sep 2026', focus: 'all',
+  title: 'Un detector de obstáculos para caminar a ciegas, medido hasta el edge',
+  sub: 'Cómo se construyó el detector de 24 clases de AriaGuard: datos reproducibles, dos tamaños de modelo, benchmark con metodología en una RTX y en una Jetson, y un experimento de autoanotación prerregistrado. Con lo que salió bien y lo que no.',
+  intro: `
+  <div class="pitch">
+    <span class="lbl">Pitch</span>
+    <p><strong>Problema.</strong> Una persona ciega que camina con gafas con cámara necesita que el sistema vea puertas, escaleras, farolas o sillas de ruedas. COCO no tiene esas clases, y el modelo tiene que correr en un dispositivo pequeño.</p>
+    <p><strong>Qué hice.</strong> Un pipeline reproducible: dataset combinado (COCO + Open Images) fijado por IDs, YOLO26 nano y small, evaluación por clase, TensorRT FP16/INT8 y un benchmark con el mismo protocolo en una RTX 5060 Ti y en una Jetson Orin Nano. Más un experimento para ver si la autoanotación arregla la clase más débil.</p>
+    <p><strong>Resultado honesto.</strong> FP16 es la elección en los dos dispositivos; INT8 no pasó el criterio fijado antes de medir. En la Jetson la red tarda 4 ms y el sistema 23 ms: el cuello es la CPU. La autoanotación recuperó el 63 % de lo que dan etiquetas humanas para <code>Stairs</code>.</p>
+  </div>
+  ${stats([
+    {num:'4.1 ms', lbl:'engine nano FP16 · Jetson', good:true},
+    {num:'22.9 ms', lbl:'extremo a extremo · Jetson'},
+    {num:'+0.079', lbl:'AP50 Stairs con autoanotación', good:true},
+    {num:'14 179', lbl:'imágenes, reconstruidas idénticas'}
+  ])}
+  ${explain('Cómo leer esta web: el método de 5 pasos', `<p>Cada fase se cuenta con una adaptación de <em>How to Solve It</em> de Pólya (1945). Las cifras salen de los JSON de <code>benchmarks/</code>.</p>`)}
+  ${POLYA_FIG([['1 · Entender','qué problema es'],['2 · Simular','un caso con números'],['3 · Escribir','código y decisión'],['4 · Medir','qué salió y cómo'],['5 · Mirar atrás','qué cambiaría']], 'Pólya tenía cuatro pasos. «Concebir un plan» se convierte en simular un caso concreto, y «examinar la solución» se parte en medir y mirar atrás, porque el código se puede ejecutar y contradecir.', 'lo aprendido alimenta la siguiente vuelta')}
   `,
   beats: [],
   qa: [
-    {q:'¿Cómo explico este proyecto en dos minutos?', a:`<p>Sigue el orden de los 5 pasos. <strong>Entender:</strong> un sistema de navegación asistida necesitaba detectar clases que COCO no tiene, como puertas o escaleras. <strong>Simular y escribir:</strong> no se pueden añadir clases a YOLO sin que olvide las originales, así que combiné un subset de COCO con imágenes de Open Images, remapeando los IDs, y construí un framework para anotar, entrenar y exportar. <strong>Medir:</strong> 451 FPS en TensorRT FP16, pero un mAP50 de 0.47, con clases débiles justo donde más importa. <strong>Mirar atrás:</strong> el paso de combinar datasets no está automatizado, nunca evalué con vídeo real de las gafas y la validación de la primera versión estaba contaminada. Eso es lo primero que arreglaría.</p>`},
-    {q:'¿Qué hice yo exactamente?', a:`<p>Todo: definir el problema, los datos, el código, los entrenamientos y los benchmarks. Soy el único autor de los 133 commits. Usé asistentes de IA como apoyo, pero las decisiones y la validación de resultados son mías. Por eso puedo explicar cada número de esta página y también sus límites.</p>`}
+    {q:'¿Cómo explico este proyecto en dos minutos?', a:`<p><strong>Entender:</strong> un sistema de navegación asistida necesitaba clases que COCO no tiene. <strong>Decisión clave:</strong> un dataset combinado, porque el fine-tuning sustituye la cabeza y olvida lo que no ve. <strong>Medir:</strong> un protocolo idéntico en RTX y Jetson, con percentiles, métrica por clase y el criterio de INT8 escrito antes. <strong>Resultados:</strong> FP16 en todo; en la Jetson el cuello es la CPU (4 ms la red, 23 ms el sistema); la autoanotación captura el 63 % de la ganancia de etiquetar a mano.</p>`},
+    {q:'¿Qué parte es la más interesante técnicamente?', a:`<p>Que <strong>acelerar el modelo no aceleró el sistema</strong>. INT8 explícito bajó el engine del small de 6,7 a 5,1 ms en la Jetson y el total no se movió, porque ~17 ms son CPU. Eso cambia qué optimizar: primero el pipeline (pre-proceso en GPU, C++), después la red.</p>`},
+    {q:'¿Qué haría distinto?', a:`<p>Construir el dataset por código desde el primer día, medir por clase y el engine aislado desde el principio, y no fiarme del INT8 por defecto de una librería. Está en la fase «Mirar atrás».</p>`}
   ]
 },
 
-/* ───────────────────────── 1 · ORIGEN VR ───────────────────────── */
+/* 1 · DATASET */
 {
-  id: 'origen', label: 'El origen: un detector para VR', date: '3–8 dic 2025 · d319f58 → ae29ec0',
-  focus: ['datos','anotar','dataset','entrenar','evaluar'],
-  title: 'Primero, un solo objeto en un mundo virtual',
-  sub: 'Antes de ser un framework, el proyecto era un detector de un único objeto: pilares con un patrón de tablero amarillo y negro, dentro de un entorno de Unreal Engine. Ahí aparecieron casi todos los problemas que vendrían después.',
+  id: 'dataset', label: '24 clases sin olvidar COCO', date: 'feb 2026 · sep 2026 (reproducible)',
+  focus: ['datos','dataset'],
+  title: 'Un dataset con todo, y que se pueda reconstruir',
+  sub: 'Para añadir puertas o escaleras sin perder personas o coches hace falta un solo dataset con las 24 clases. Y para que los resultados valgan, ese dataset tiene que salir del código.',
   beats: [
-    {tag:'entender', h:'Un vídeo, cero etiquetas', body:`<p>El punto de partida era un vídeo capturado en VR y una imagen recortada del pilar. Anotar a mano cientos de frames era lento, y la herramienta clásica, LabelImg, se colgaba en Python 3.12 (<code>drawLine(): argument 1 has unexpected type 'float'</code>).</p>
-    <p>La pregunta real no era cómo entrenar YOLO, sino <strong>cómo conseguir etiquetas sin etiquetar a mano</strong>.</p>`},
-    {tag:'simular', h:'Template matching con un frame concreto', body:`<p>La idea es deslizar la imagen del pilar (el template) sobre el frame y calcular en cada posición cuánto se parecen. Donde la similitud supera un umbral, hay una detección.</p>
-    ${fig(`
-      <rect class="s-box" x="20" y="20" width="250" height="140" rx="6"/>
-      <text class="s-d" x="30" y="38">frame 1280×720</text>
-      <rect x="70" y="60" width="44" height="80" rx="3" fill="none" style="stroke:var(--accent)" stroke-width="2"/>
-      <rect x="180" y="60" width="44" height="80" rx="3" fill="none" style="stroke:var(--danger)" stroke-width="2" stroke-dasharray="4 3"/>
-      <text class="s-ok" x="92" y="154" text-anchor="middle">0.93</text>
-      <text class="s-bad" x="202" y="154" text-anchor="middle">0.74</text>
-      <line class="s-line" x1="270" y1="90" x2="320" y2="90" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="325" y="30" width="250" height="44" rx="6"/>
-      <text class="s-t" x="450" y="57" text-anchor="middle">umbral 0.70 → 2 detecciones</text>
-      <rect class="s-box-ok" x="325" y="96" width="250" height="44" rx="6"/>
-      <text class="s-t" x="450" y="123" text-anchor="middle">umbral 0.85 → 1 detección</text>
-      <text class="s-bad" x="450" y="170" text-anchor="middle">el tablero se repite → falsos positivos</text>
-    `, '0 0 600 180', 'Simulación ilustrativa, con valores de ejemplo: el patrón de tablero se repite en zonas que no son el pilar. Con umbral 0.70 esas zonas pasan el filtro; al subirlo a 0.85–0.95 desaparecen, a cambio de perder pilares vistos en ángulos raros.', 'Template deslizando sobre un frame con dos puntuaciones y el efecto de dos umbrales')}
-    <p>El mismo razonamiento explica el siguiente fallo: un pilar <strong>invertido</strong>, con el negro arriba, se parece poco al template normal y no pasa el umbral. Hizo falta un segundo template.</p>`},
-    {tag:'escribir', h:'Un script por paso, con una persona revisando', body:`<p>Cada paso del flujo es un script independiente. La revisión humana (<code>review_annotations.py</code>) está en medio a propósito: la auto-anotación propone y una persona decide.</p>
-    ${fig(`
-      ${pipelineSvg([['auto_annotate','template + NMS'],['visualize','ver cajas'],['review','humano acepta'],['split_dataset','80/20 seed 42'],['train · eval','YOLOv12s']])}
-      <path class="s-line" d="M 694 86 C 694 130, 104 130, 104 90" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
-      <text class="s-bad" x="400" y="126" text-anchor="middle">pilares invertidos no detectados → template nuevo → re-anotar</text>
-    `, '0 0 1000 140', 'El flujo de la primera versión. La flecha de vuelta es el bucle real que hubo que recorrer cuando el modelo no detectaba los pilares invertidos.', 'Pipeline de cinco scripts con bucle de retorno')}
-    ${code('scripts/split_dataset.py','división train/val', [
-      '<span class="kw">def</span> <span class="fn">split_pairs</span>(pairs, train_ratio=<span class="num">0.8</span>, seed=<span class="num">42</span>):',
-      '    random.seed(seed)',
-      '    shuffled = pairs.copy()',
-      '    random.shuffle(shuffled)          <span class="c1"># ← frames de UN vídeo, barajados</span>',
-      '    split_idx = int(len(shuffled) * train_ratio)',
-      '    <span class="kw">return</span> shuffled[:split_idx], shuffled[split_idx:]'
-    ].join('\n'))}`,
-    chips:['0ec9c97 auto-annotate template matching','f83a122 review_annotations','699d080 evaluate, export, benchmark']},
-    {tag:'medir', h:'Cuatro entrenamientos', body:`${table(['#','Modelo','Datos','mAP50-95','Nota'],[
-      ['1','YOLOv8n · 10 ép.','555 train','62.7%','baseline'],
-      ['2','YOLOv12s · 50 ép.','555 train','84.7%','+22 puntos por modelo mayor'],
-      ['3','YOLOv12s · 100 ép.','+7 invertidos','87.4%','insuficiente'],
-      ['4','YOLOv12s · 100 ép.','+59 invertidos','87.4%','final']
-    ])}
-    ${stats([{num:'98.7%', lbl:'mAP50 final'},{num:'99.2%', lbl:'recall'},{num:'71 → 180', lbl:'FPS PyTorch → TensorRT', good:true},{num:'RTX 2060', lbl:'6 GB'}])}
-    <p>Los modelos detectaban "fantasmas" con confianza de 0.50–0.55, así que subí el umbral de inferencia de 0.25 a 0.65.</p>`,
-    chips:['9d30375 TensorRT 180 FPS']},
-    {tag:'mirar', h:'Ese 98.7% es optimista', body:`${caveat('Fuga de datos entre train y val', `<p>Todos los frames salen del mismo vídeo y <code>split_pairs</code> los baraja al azar. Dos frames consecutivos son casi idénticos, así que es muy probable que el modelo se evaluara con imágenes prácticamente vistas en el entrenamiento. El 98.7% mide memoria del vídeo, no generalización.</p><p><strong>Qué haría hoy:</strong> dividir por bloques de tiempo o por escenas, nunca frame a frame.</p>`)}
-    <ul>
-      <li><strong>Añadir 59 frames invertidos no movió el mAP50-95</strong> (87.4% → 87.4%). O la validación casi no tenía pilares invertidos, o la métrica agregada tapaba el caso que importaba. No lo comprobé, y debería haber medido ese subconjunto por separado.</li>
-      <li><strong>Subir el umbral a 0.65 es un parche</strong>: quita fantasmas, pero también detecciones reales. La solución de fondo es añadir ejemplos negativos difíciles.</li>
-      <li><strong>Lo que sí funcionó:</strong> auto-anotar más revisión humana. Es la idea que sobrevive en todo el proyecto.</li>
-    </ul>`}
+    {tag:'entender', h:'El fine-tuning olvida', body:`<p>Entrenar YOLO sobre un dataset nuevo <strong>sustituye la cabeza de detección</strong>. Si el dataset solo tiene las 6 clases nuevas, el modelo deja de detectar las 80 de COCO. Congelar el backbone no lo evita: la cabeza sigue siendo nueva.</p>`},
+    {tag:'simular', h:'Dos fuentes, un espacio de IDs', body:`${fig(`
+      <rect class="s-box" x="20" y="20" width="230" height="58" rx="7"/><text class="s-t" x="135" y="44" text-anchor="middle">COCO 2017 · 18 clases</text><text class="s-d" x="135" y="64" text-anchor="middle">IDs 0-17 · 8 000 / 2 000</text>
+      <rect class="s-box" x="20" y="100" width="230" height="58" rx="7"/><text class="s-t" x="135" y="124" text-anchor="middle">Open Images V7 · 6 clases</text><text class="s-d" x="135" y="144" text-anchor="middle">IDs 0-5 → 18-23 · 3 608 / 571</text>
+      <line class="s-line" x1="250" y1="49" x2="330" y2="80" marker-end="url(#arrow)"/><line class="s-line" x1="250" y1="129" x2="330" y2="98" marker-end="url(#arrow)"/>
+      <rect class="s-box-ok" x="335" y="60" width="250" height="58" rx="7"/><text class="s-t" x="460" y="84" text-anchor="middle">nav_combined · 24 clases</text><text class="s-d" x="460" y="104" text-anchor="middle">11 608 train · 2 571 val</text>
+    `, '0 0 610 170', 'Las clases que COCO no tiene (Door, Stairs, Street light, Traffic sign, Tree, Wheelchair) se desplazan detrás de las 18 de COCO para que ningún ID choque.', 'Diagrama del dataset combinado')}`},
+    {tag:'escribir', h:'Manifiestos, no pasos manuales', body:`<p>El dataset original se montó con pasos a mano y no se podía reproducir. Reconstruyéndolo encontré la regla de COCO (las primeras imágenes por ID que contienen una clase de navegación), pero no la de Open Images, que venía de una descarga anterior. La solución: <strong>fijar los IDs exactos</strong> en <code>data_manifest/</code> y convertir las etiquetas desde las anotaciones originales.</p>
+    ${code('scripts/build_dataset.py', 'uso', `uv run python scripts/build_dataset.py --out data/nav_rebuilt --verify data/nav_combined`)}`},
+    {tag:'medir', h:'Idéntico, en un minuto', body:`<p>Reconstruido desde cero en ~1 minuto: <strong>etiquetas idénticas en las 14 179 imágenes</strong> (tolerancia 1e-4) e imágenes idénticas byte a byte en una muestra de 600. Por eso los modelos publicados no hubo que reentrenarlos.</p>
+    ${table(['Clase (val)','Instancias','Imágenes'], [['person','6 404','1 511'],['Door','287','204'],['Wheelchair','117','48'],['Stairs','45','36'],['Street light','40','7']], [3,4])}`},
+    {tag:'mirar', h:'Lo que el dataset no arregla', body:`${caveat('Etiquetas parciales', `<p>Las imágenes de Open Images no etiquetan personas o coches con las clases de COCO, y las de COCO no etiquetan puertas ni escaleras. El modelo aprende que esos objetos son fondo en la mitad de las imágenes. Y <code>Stairs</code> tiene solo 45 instancias de validación: su mAP es ruidoso.</p>`)}`}
   ],
   qa: [
-    {q:'Mi primer modelo tiene un mAP50 del 98.7%. ¿Me lo creo?', a:`<p>No del todo. Los frames vienen de un único vídeo y el split es aleatorio frame a frame, así que en validación hay frames casi idénticos a los de entrenamiento. Es fuga de datos. El número dice que el modelo reconoce ese vídeo, no que funcione en otro. Para creérmelo haría un split por bloques temporales y probaría con otra grabación.</p>`},
-    {q:'Subí el umbral de confianza de 0.25 a 0.65. ¿Qué me costó?', a:`<p>Menos falsos positivos a cambio de menos recall: los pilares reales con confianza entre 0.25 y 0.65 dejan de detectarse. En un sistema de seguridad para peatones, perder un obstáculo real es peor que un aviso de más. Lo correcto sería elegir el umbral con la curva precision-recall en validación y atacar la causa con ejemplos negativos, no fijarlo a ojo.</p>`},
-    {q:'Añadí 59 frames de pilares invertidos y el mAP50-95 no cambió. ¿Cómo lo interpreto?', a:`<p>Una métrica agregada puede esconder el subgrupo que te importa. Si la validación tiene pocos pilares invertidos, mejorar en ellos casi no mueve la media. Lo que falta es evaluar ese subconjunto por separado. No lo hice, y es una de las lecciones que me llevo.</p>`}
+    {q:'¿Por qué no entrenar solo las clases nuevas y usar dos modelos?', a:`<p>Dos modelos duplican cómputo y memoria en un dispositivo pequeño, y la latencia se suma. Un solo modelo con 24 clases es más barato en edge. El precio son las etiquetas parciales.</p>`},
+    {q:'¿Por qué un subconjunto de COCO y no COCO entero?', a:`<p>El modelo base ya se preentrenó en COCO completo; basta con suficientes ejemplos de las clases útiles para que no las olvide. Las 62 clases irrelevantes (pizza, tostadora) solo añaden ruido y tiempo.</p>`},
+    {q:'¿Cómo sé que el dataset reconstruido es el mismo?', a:`<p><code>--verify</code> compara cada fichero de etiquetas con tolerancia de redondeo, y hay tests que comprueban que las imágenes coinciden exactamente con el manifiesto y que train y val no se solapan.</p>`}
   ]
 },
 
-/* ───────────────────────── 2 · ZERO-SHOT ───────────────────────── */
+/* 2 · ENTRENAR */
 {
-  id: 'zeroshot', label: 'Anotar sin anotar: zero-shot', date: '15 dic 2025 · a6bf6ad, 6b5a4a7',
-  focus: ['anotar'],
-  title: 'Describir el objeto con texto en vez de recortarlo',
-  sub: 'Con template matching, cada aspecto nuevo del objeto necesita otro template, y eso no escala. Así que probé modelos que detectan a partir de una frase: YOLO-World falló y Grounding DINO funcionó.',
+  id: 'entrenar', label: 'Nano y small, misma receta', date: 'feb 2026 · sep 2026',
+  focus: ['entrenar','evaluar'],
+  title: 'Dos tamaños para dos papeles',
+  sub: 'Nano es el objetivo edge; small, la referencia de precisión. Mismos datos, misma receta, mismo seed, para que la única diferencia sea el tamaño.',
   beats: [
-    {tag:'entender', h:'El cuello de botella eran las etiquetas, no el modelo', body:`<p>Entrenar YOLO es un comando. Conseguir miles de cajas bien puestas es semanas de trabajo. Si un modelo <em>zero-shot</em> (que detecta clases que no ha visto, guiado por texto) propone las cajas y una persona solo revisa, el coste baja un orden de magnitud.</p>`},
-    {tag:'simular', h:'Una imagen, de principio a fin', body:`${fig(`
-      <rect class="s-box" x="16" y="20" width="170" height="44" rx="6"/><text class="s-t" x="101" y="47" text-anchor="middle">imagen 1280×720</text>
-      <rect class="s-box" x="16" y="80" width="170" height="44" rx="6"/><text class="s-t" x="101" y="100" text-anchor="middle">"yellow and black</text><text class="s-t" x="101" y="115" text-anchor="middle">checkered box."</text>
-      <line class="s-line" x1="186" y1="42" x2="226" y2="66" marker-end="url(#arrow)"/><line class="s-line" x1="186" y1="102" x2="226" y2="80" marker-end="url(#arrow)"/>
-      <rect class="s-box-ok" x="230" y="46" width="150" height="54" rx="6"/><text class="s-t" x="305" y="70" text-anchor="middle">Grounding DINO</text><text class="s-d" x="305" y="88" text-anchor="middle">tiny · transformers</text>
-      <line class="s-line" x1="380" y1="73" x2="415" y2="73" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="418" y="46" width="150" height="54" rx="6"/><text class="s-t" x="493" y="68" text-anchor="middle">cajas + scores</text><text class="s-d" x="493" y="86" text-anchor="middle">score ≥ 0.30</text>
-      <line class="s-line" x1="568" y1="73" x2="603" y2="73" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="606" y="46" width="260" height="54" rx="6"/><text class="s-t" x="736" y="68" text-anchor="middle">0 0.375 0.500 0.125 0.444</text><text class="s-d" x="736" y="86" text-anchor="middle">línea YOLO: clase cx cy w h</text>
-    `, '0 0 880 140', 'El flujo de una imagen. El texto termina en punto porque Grounding DINO separa las frases por puntos.', 'Imagen y texto entran en Grounding DINO, salen cajas, se filtran y se convierten a formato YOLO')}
-    ${explain('La conversión a mano, con números', `<p>Caja en píxeles <code>(x1, y1, x2, y2) = (400, 200, 560, 520)</code> en una imagen de 1280×720. YOLO quiere el centro y el tamaño normalizados entre 0 y 1:</p>
-    <p><code>cx = (400+560)/2/1280 = 0.375</code> · <code>cy = (200+520)/2/720 = 0.500</code> · <code>w = 160/1280 = 0.125</code> · <code>h = 320/720 = 0.444</code></p>
-    <p>Si normalizas con el ancho donde tocaba el alto, las cajas salen desplazadas y el entrenamiento no da error: aprende basura en silencio. Por eso existe <code>visualize_annotations.py</code>.</p>`)}`},
-    {tag:'escribir', h:'El núcleo del anotador', body:`${code('src/annotation.py','AutoAnnotator.annotate_image', [
-      '<span class="c1"># Grounding DINO separa frases por punto</span>',
-      'prompt = prompt <span class="kw">if</span> prompt.endswith(<span class="str">"."</span>) <span class="kw">else</span> prompt + <span class="str">"."</span>',
-      '',
-      'inputs = <span class="kw">self</span>.processor(images=pil_image, text=prompt, return_tensors=<span class="str">"pt"</span>).to(<span class="kw">self</span>.device)',
-      '<span class="kw">with</span> torch.no_grad():',
-      '    outputs = <span class="kw">self</span>.model(**inputs)',
-      '',
-      'results = <span class="kw">self</span>.processor.post_process_grounded_object_detection(',
-      '    outputs, input_ids=inputs.input_ids, target_sizes=[(height, width)])[<span class="num">0</span>]',
-      '',
-      'mask = results[<span class="str">"scores"</span>] >= threshold      <span class="c1"># 0.3 por defecto</span>',
-      'boxes = results[<span class="str">"boxes"</span>][mask].cpu().numpy()'
-    ].join('\n'))}
-    <p><strong>Decisión:</strong> cargar el modelo con Hugging Face <code>transformers</code> en vez de compilar el repo original. Instalarlo es trivial y la dependencia queda como <em>extra</em> opcional (<code>uv sync --extra annotation</code>).</p>`,
-    chips:['a6bf6ad YOLO-World','6b5a4a7 Grounding DINO']},
-    {tag:'medir', h:'Mismo conjunto, dos modelos', body:`${table(['Métrica (47 imágenes)','YOLO-World','Grounding DINO'],[
-      ['Imágenes con alguna detección','8.5%','100%'],
-      ['Detecciones totales','6','259'],
-      ['Rango de confianza','0.05–0.09','0.25–0.69'],
-      ['Velocidad','~25 img/s','~2 img/s']
-    ])}
-    <p>Con YOLO-World, prompts como <code>"yellow black checkered cube"</code> o <code>"yellow box"</code> dieron cero detecciones. Mi hipótesis, no verificada: su parte de lenguaje (CLIP) se entrenó con fotos reales y le cuesta con texturas sintéticas de VR.</p>`},
-    {tag:'mirar', h:'Detectar mucho no es detectar bien', body:`${caveat('Lo que la tabla no dice', `<p>"100% de cobertura" y "259 detecciones" miden <strong>cantidad</strong>, no si las cajas eran correctas. Salen 5.5 detecciones por imagen y nunca comparé con un conjunto etiquetado a mano, así que no sé cuántas eran falsas. En el diario escribí "43 veces mejor", y esa frase compara conteos, no calidad.</p>`)}
-    <ul>
-      <li><strong>Qué haría:</strong> etiquetar a mano unas 50 imágenes como <em>gold set</em> y medir precisión y recall del anotador con varios umbrales antes de fiarme de él.</li>
-      <li><strong>El trade-off de velocidad era aceptable</strong>: 12 veces más lento, pero la anotación es un proceso offline que se hace una vez.</li>
-      <li><strong>El riesgo de fondo:</strong> si entrenas con etiquetas de otro modelo, heredas sus errores sistemáticos. Lo que falle el anotador, el detector aprenderá a fallarlo.</li>
-    </ul>`}
+    {tag:'entender', h:'Por qué YOLO26', body:`<p>YOLO26 es <strong>end-to-end, sin NMS</strong>: no hay post-proceso de supresión de cajas, lo que simplifica exportar a TensorRT y quita trabajo de CPU en el dispositivo. El fine-tuning reentrena todo el modelo (backbone, neck y head), sin congelar capas.</p>`},
+    {tag:'escribir', h:'Una receta versionada', body:`${code('config.yaml', 'extracto', `epochs: 50\npatience: 20\nclose_mosaic: 10\nbatch: -1      # autoajuste a la VRAM\nseed: 42`)}
+    <p>Un detalle que encontré al alinear la receta: <code>train.py</code> ignoraba <code>close_mosaic</code> y <code>cos_lr</code> aunque estuvieran en el YAML. Ahora se pasan.</p>`},
+    {tag:'medir', h:'Resultados de entrenamiento', body:`${table(['Modelo','Mejor época','mAP50 val','mAP50-95 val','Tiempo (RTX 5060 Ti)'], [['YOLO26s','37 / 50','0.470','0.311','~100 min'],['YOLO26n','50 / 50','0.395','0.260','~61 min']])}
+    <p>Nano pierde 0,075 de mAP50 a cambio de un modelo 4 veces más pequeño. Su mejor época fue la última: probablemente le faltaron épocas.</p>`},
+    {tag:'mirar', h:'Cuidado con comparar números de protocolos distintos', body:`<p>La validación del entrenamiento usa batch 32 con relleno rectangular; el benchmark usa batch 1. Por eso <code>Stairs</code> del nano sale 0,330 en un sitio y 0,316 en el otro. Solo se comparan números del mismo protocolo.</p>`}
   ],
   qa: [
-    {q:'¿Cómo sé que las anotaciones automáticas son buenas?', a:`<p>Con este proyecto, solo por inspección visual y la revisión con <code>review_annotations.py</code>. No es suficiente. Lo riguroso es un <em>gold set</em> etiquetado a mano y medir precisión y recall del anotador contra él, eligiendo el umbral según esa curva. Es lo primero que añadiría.</p>`},
-    {q:'YOLO-World es 12 veces más rápido. ¿Por qué no usarlo?', a:`<p>Porque en este dominio no detectaba casi nada: 8.5% de las imágenes con confianzas por debajo de 0.1. La velocidad no importa si la salida no sirve, y además anotar es un proceso offline. Si fuera inferencia en tiempo real, el trade-off sería otro.</p>`},
-    {q:'¿Qué riesgo tiene entrenar un detector con etiquetas generadas por otro modelo?', a:`<p>Que copia sus errores. Si Grounding DINO no ve pilares pequeños o a contraluz, esos casos entran como fondo y el detector aprende a ignorarlos. Se mitiga con revisión humana, un gold set para medir al anotador y añadiendo a mano los casos difíciles.</p>`}
+    {q:'¿Qué métodos de fine-tuning existen y cuál usé?', a:`<p>Reentrenar todo (el usado aquí), congelar el backbone y entrenar neck y head (rápido, pocos datos), descongelado progresivo, distilación (el small enseña al nano), QAT para INT8, y adaptadores tipo LoRA, más habituales en transformers.</p>`},
+    {q:'¿mAP50 o mAP50-95?', a:`<p>mAP50 dice si encuentro el objeto; mAP50-95 además si la caja es ajustada. Para avisar de un obstáculo importa sobre todo encontrarlo, pero una caja mala da una distancia mala.</p>`}
   ]
 },
 
-/* ───────────────────────── 3 · FRAMEWORK ───────────────────────── */
+/* 3 · METODOLOGÍA */
 {
-  id: 'framework', label: 'De script a framework', date: '15 ene – 20 feb 2026 · 02295c8, 53029a4, f03846c',
-  focus: ['framework'],
-  title: 'Separar la interfaz de la lógica, y quitar todo lo que decía "pilar"',
-  sub: 'El proyecto funcionaba para un objeto y una GPU. Para reutilizarlo con cualquier dataset hubo que partir un app.py de cientos de líneas y eliminar lo que estaba escrito a fuego.',
+  id: 'metodologia', label: 'Medir sin engañarse', date: 'sep 2026 · docs/BENCHMARK_METHODOLOGY.md',
+  focus: ['exportar','desplegar','medir'],
+  title: 'Un protocolo idéntico en una RTX y en una Jetson',
+  sub: 'El benchmark antiguo cronometraba ruido aleatorio y daba solo una media. El nuevo mide con imágenes reales, percentiles, precisión por clase y un registro con todo el entorno.',
   beats: [
-    {tag:'entender', h:'Todo vivía en app.py', body:`<p>La interfaz Gradio, el entrenamiento, la inferencia y la anotación estaban mezclados en un solo archivo. El refactor movió 839 líneas a módulos. Además, rutas, nombres de clase ("pillar") y parámetros de GPU estaban escritos a mano.</p>
-    <p>Consecuencia: probar una función exigía arrancar la interfaz, y cambiar de GPU o de dataset exigía editar código.</p>`},
-    {tag:'simular', h:'La misma llamada en tres máquinas', body:`<p><code>suggest_training_defaults()</code> decide los parámetros según la VRAM detectada:</p>
-    ${table(['Máquina','VRAM','batch','workers','cache','amp'],[
-      ['RTX 5060 Ti','16 GB','-1 (auto)','8','ram','sí'],
-      ['RTX 2060','6 GB','8','4','disco','sí'],
-      ['Portátil sin GPU','—','4','4','no','no']
-    ])}
-    <p><code>batch=-1</code> activa AutoBatch de Ultralytics, que estima cuántas imágenes caben en una fracción de la VRAM. Así el mismo <code>config.yaml</code> sirve en máquinas distintas.</p>`},
-    {tag:'escribir', h:'Tres capas', body:`${fig(`
-      <rect class="s-box" x="60" y="16" width="260" height="50" rx="7"/><text class="s-t" x="190" y="38" text-anchor="middle">app.py · Gradio</text><text class="s-d" x="190" y="55" text-anchor="middle">7 pestañas, sin lógica</text>
-      <rect class="s-box" x="480" y="16" width="260" height="50" rx="7"/><text class="s-t" x="610" y="38" text-anchor="middle">scripts/ · CLI</text><text class="s-d" x="610" y="55" text-anchor="middle">train, inference, export…</text>
-      <line class="s-line" x1="190" y1="66" x2="330" y2="104" marker-end="url(#arrow)"/><line class="s-line" x1="610" y1="66" x2="470" y2="104" marker-end="url(#arrow)"/>
-      <rect class="s-box-ok" x="40" y="108" width="720" height="62" rx="7"/>
-      <text class="s-t" x="400" y="130" text-anchor="middle">src/ · la lógica, importable y testeable</text>
-      <text class="s-d" x="400" y="152" text-anchor="middle">hardware · project · training · inference · dataset · annotation · benchmark</text>
-      <line class="s-line" x1="400" y1="170" x2="400" y2="196" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="200" y="200" width="400" height="40" rx="7"/><text class="s-t" x="400" y="225" text-anchor="middle">Ultralytics · PyTorch · transformers</text>
-    `, '0 0 800 250', 'La interfaz web y la CLI son dos puertas a la misma lógica. Si mañana hace falta una API REST, sería una tercera puerta sin tocar src/.', 'Arquitectura de tres capas')}
-    ${code('src/hardware.py','suggest_training_defaults', [
-      'vram = gpu.vram_gb',
-      '<span class="kw">if</span> vram >= <span class="num">16</span>:',
-      '    <span class="kw">return</span> {<span class="str">"batch"</span>: -<span class="num">1</span>, <span class="str">"workers"</span>: <span class="num">8</span>, <span class="str">"cache"</span>: <span class="str">"ram"</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}',
-      '<span class="kw">elif</span> vram >= <span class="num">8</span>:',
-      '    <span class="kw">return</span> {<span class="str">"batch"</span>: -<span class="num">1</span>, <span class="str">"workers"</span>: <span class="num">8</span>, <span class="str">"cache"</span>: <span class="str">"ram"</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}  <span class="c1"># ← idéntica a la de arriba</span>',
-      '<span class="kw">elif</span> vram >= <span class="num">4</span>:',
-      '    <span class="kw">return</span> {<span class="str">"batch"</span>: <span class="num">8</span>, <span class="str">"workers"</span>: <span class="num">4</span>, <span class="str">"cache"</span>: <span class="kw">True</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}'
-    ].join('\n'))}
-    <p>También migré de <code>pip</code> a <code>uv</code>, con <code>pyproject.toml</code> y extras opcionales, para que las dependencias pesadas (transformers, FiftyOne) solo se instalen si se usan.</p>`,
-    chips:['02295c8 split app.py into src/','53029a4 remove VR hardcoding','f03846c migrate to uv']},
-    {tag:'medir', h:'Un bug que la interfaz no dejaba ver', body:`<p>Tras actualizar PyTorch, la interfaz empezó a mostrar siempre "GPU: Not available" en una máquina con GPU. El atributo de memoria que leía el código no existía en esa versión. El <code>except Exception</code> se tragaba el <code>AttributeError</code> y devolvía "sin GPU" sin avisar.</p>
-    ${code('src/hardware.py','fix 0c5018d', [
-      '<span class="c1">- vram_mb = torch.cuda.get_device_properties(0).total_mem // (1024 * 1024)</span>',
-      '<span class="str">+ props = torch.cuda.get_device_properties(0)</span>',
-      '<span class="str">+ total_bytes = getattr(props, "total_memory", None) or getattr(props, "total_mem", 0)</span>',
-      '<span class="str">+ vram_mb = total_bytes // (1024 * 1024)</span>'
-    ].join('\n'))}`,
-    chips:['0c5018d GPU detection fix']},
-    {tag:'mirar', h:'El fix trató el síntoma', body:`${caveat('Sigue ahí', `<p>El <code>except Exception</code> que escondió el bug <strong>sigue en el código</strong>. La próxima vez que algo falle dentro de <code>detect_gpu()</code> volverá a pasar lo mismo. Como mínimo debería registrar la excepción. Mejor aún, capturar solo los errores esperados.</p>`)}
-    <ul>
-      <li><strong>Las ramas de 16 GB y 8 GB son idénticas.</strong> O la distinción sobra, o faltan parámetros distintos, como el <code>imgsz</code>. Es código que aparenta una decisión que no toma.</li>
-      <li><strong>Por verificar:</strong> <code>pyproject.toml</code> declara comandos (<code>fts-train</code>…) pero no tiene <code>[build-system]</code>, así que probablemente no se instalan. En el README uso <code>uv run python scripts/…</code>, que sí funciona.</li>
-      <li><strong>Lo que salió bien:</strong> gracias a la separación en <code>src/</code> existen tests unitarios que no necesitan arrancar Gradio.</li>
-    </ul>`}
+    {tag:'entender', h:'Qué puede falsear una medida', body:`<p>Imágenes de ruido que no representan el uso real. Una media que esconde picos. Olvidar que la GPU es asíncrona. Medir mientras otro proceso usa la GPU. Evaluar con un IoU distinto al del entrenamiento (el script antiguo usaba 0,6 y el entrenamiento 0,7). Y comparar engines construidos en otra máquina.</p>`},
+    {tag:'escribir', h:'El protocolo, en código', body:`<ul>
+      <li>500 imágenes reales de val, con seed fijo, <strong>precargadas</strong> en memoria: el disco no entra en la medida.</li>
+      <li>50 inferencias de warm-up y <code>torch.cuda.synchronize()</code> tras cada una.</li>
+      <li>Media, p50, p90, p95, p99 extremo a extremo, más el desglose y el <strong>engine solo</strong>.</li>
+      <li>mAP global y por clase sobre val completo con <code>conf=0.001, iou=0.7, batch=1</code>.</li>
+      <li>Engines construidos <strong>en el dispositivo</strong> que los ejecuta.</li>
+      <li>El script se niega a medir si otro proceso usa la GPU.</li>
+    </ul>`},
+    {tag:'medir', h:'Cada número con ficha', body:`<p>Cada ejecución escribe un JSON con GPU, driver, CUDA, TensorRT, PyTorch, Ultralytics, commit, comando y resultados. Las tablas del README las genera <code>make_tables.py</code>. Una prueba de coherencia: <strong>el mAP sale idéntico en la RTX y en la Jetson</strong> para cada precisión.</p>`},
+    {tag:'mirar', h:'Versiones: igual lo que controlo', body:`<p>Dataset, pesos, commit y Ultralytics 8.4.14 son idénticos en los dos dispositivos. TensorRT no: la RTX 5060 Ti (Blackwell) exige ≥ 10.8 y JetPack 6.2 trae 10.3. Eso se registra, no se iguala.</p>`}
   ],
   qa: [
-    {q:'¿Por qué separar src/ de app.py y de scripts/?', a:`<p>Para tener una única implementación de cada cosa y poder testearla. Antes, entrenar desde la interfaz y desde la CLI eran dos caminos que podían divergir. Ahora los dos llaman a <code>src/</code>. Además, <code>src/</code> se importa sin cargar Gradio, y eso hace los tests rápidos y posibles en CI.</p>`},
-    {q:'Mi detect_gpu() tiene un except Exception. ¿Qué problema tiene?', a:`<p>Convierte cualquier error en un resultado válido ("no hay GPU"). Ya me pasó: un cambio de API de PyTorch hizo que la interfaz dijera que no había GPU, sin ningún error visible. Un <code>except</code> amplio es aceptable en el borde de la interfaz si registra el error. Dentro de la lógica, hay que capturar solo lo esperado y dejar que lo inesperado explote.</p>`},
-    {q:'¿Qué hace batch=-1 y cuándo no lo usaría?', a:`<p>Activa AutoBatch de Ultralytics, que prueba el uso de memoria y elige el batch que cabe en una fracción de la VRAM. No lo usaría cuando necesito reproducir un experimento exacto entre máquinas, porque el batch cambia la dinámica del entrenamiento, ni en una GPU compartida con otros procesos, porque la estimación puede fallar.</p>`}
+    {q:'¿Por qué percentiles y no solo la media?', a:`<p>Porque en tiempo real lo que falla es la cola. El nano en PyTorch FP32 en la Jetson tiene media de 35 ms y p99 de 172 ms: de vez en cuando se congela un momento, y eso la media no lo dice.</p>`},
+    {q:'¿Por qué el engine se construye en cada dispositivo?', a:`<p>Un engine de TensorRT es un plan compilado para una arquitectura de GPU y una versión concreta. No es portable, así que cada máquina construye el suyo y el nombre del fichero lleva el host.</p>`}
   ]
 },
 
-/* ───────────────────────── 4 · DATASET COMBINADO ───────────────────────── */
+/* 4 · FP16 / INT8 */
 {
-  id: 'dataset', label: '24 clases sin olvidar COCO', date: '20–21 feb 2026 · 39d1a9e, 6107f4e, 8883995',
-  focus: ['datos','dataset','entrenar','evaluar'],
-  title: 'No se pueden añadir clases a YOLO: hay que reentrenar con todas',
-  sub: 'Para navegación asistida hacían falta puertas, escaleras, farolas, señales, árboles y sillas de ruedas, sin perder personas, coches ni bicis. Esta fase es el núcleo técnico del proyecto.',
+  id: 'fp16-int8', label: 'FP16, INT8 y un criterio previo', date: '16–17 sep 2026',
+  focus: ['exportar','evaluar'],
+  title: 'INT8 no se ganó su sitio',
+  sub: 'Dos vías de INT8, dos bugs de TensorRT y una regla fijada antes de medir. Resultado: FP16 en todos los casos.',
   beats: [
-    {tag:'entender', h:'La cabeza de detección se sustituye entera', body:`<p>La última capa de YOLO tiene tantas salidas como clases. Si entrenas con 6 clases, la cabeza pasa a tener 6 salidas y el modelo <strong>olvida las 80 de COCO</strong>. Congelar el backbone (<code>freeze</code>) conserva las features, pero no las clases.</p>
-    <p>Por tanto, el modelo final debe entrenarse con <strong>todas las clases a la vez</strong>, en un único dataset.</p>`},
-    {tag:'simular', h:'Seguir una etiqueta hasta el dataset final', body:`${fig(`
-      <rect class="s-box" x="16" y="16" width="300" height="74" rx="7"/>
-      <text class="s-t" x="166" y="38" text-anchor="middle">COCO subset · FiftyOne</text>
-      <text class="s-d" x="166" y="56" text-anchor="middle">18 clases · IDs 0–17 · 8 000 / 2 000</text>
-      <text class="s-ok" x="166" y="76" text-anchor="middle">person → 0 (orden de la lista)</text>
-      <rect class="s-box" x="16" y="116" width="300" height="74" rx="7"/>
-      <text class="s-t" x="166" y="138" text-anchor="middle">nav_custom · Open Images V7</text>
-      <text class="s-d" x="166" y="156" text-anchor="middle">6 clases · IDs 0–5 · 3 608 / 571</text>
-      <text class="s-bad" x="166" y="176" text-anchor="middle">Stairs = 1 → ¡choca con bicycle!</text>
-      <line class="s-line" x1="316" y1="53" x2="400" y2="92" marker-end="url(#arrow)"/>
-      <line class="s-line" x1="316" y1="153" x2="400" y2="112" marker-end="url(#arrow)"/>
-      <text class="s-t" x="360" y="140" text-anchor="middle">+18</text>
-      <rect class="s-box-ok" x="404" y="66" width="250" height="74" rx="7"/>
-      <text class="s-t" x="529" y="90" text-anchor="middle">nav_combined</text>
-      <text class="s-d" x="529" y="108" text-anchor="middle">24 clases · 11 608 / 2 571</text>
-      <text class="s-ok" x="529" y="126" text-anchor="middle">Stairs = 19 · prefijos coco_/custom_</text>
-      <line class="s-line" x1="654" y1="103" x2="700" y2="103" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="704" y="72" width="170" height="62" rx="7"/>
-      <text class="s-t" x="789" y="98" text-anchor="middle">YOLO26s</text>
-      <text class="s-d" x="789" y="116" text-anchor="middle">cabeza de 24 salidas</text>
-    `, '0 0 890 200', 'Dos fuentes y un espacio de IDs. FiftyOne exporta COCO ya con IDs 0–17 según el orden de la lista de clases. El dataset propio también empieza en 0, así que hay que desplazarlo +18 o las escaleras se entrenarían como bicicletas.', 'Dos datasets se combinan remapeando IDs')}
-    ${explain('Una línea de label, antes y después', `<p>Archivo de nav_custom: <code>1 0.52 0.61 0.20 0.35</code>, que es Stairs con ID 1.</p><p>En nav_combined: <code>19 0.52 0.61 0.20 0.35</code>. Las coordenadas no cambian, solo la clase. Si el remapeo falla, no hay error: el modelo aprende que las escaleras son bicicletas y la métrica de ambas clases cae sin explicación aparente.</p>`)}`},
-    {tag:'escribir', h:'Descargar solo lo necesario', body:`${code('docs/TRAINING_PROCESS.md','subset de COCO con FiftyOne', [
-      'dataset = foz.load_zoo_dataset(',
-      '    <span class="str">"coco-2017"</span>, split=<span class="str">"train"</span>, label_types=[<span class="str">"detections"</span>],',
-      '    classes=[<span class="str">"person"</span>, <span class="str">"car"</span>, <span class="str">"bus"</span>, ...],   <span class="c1"># solo las relevantes</span>',
-      '    max_samples=<span class="num">8000</span>)',
-      '',
-      'view = dataset.filter_labels(<span class="str">"ground_truth"</span>, F(<span class="str">"label"</span>).is_in(MY_CLASSES), only_matches=<span class="kw">True</span>)',
-      'view.export(export_dir=<span class="str">"data/coco_nav/train"</span>, dataset_type=fo.types.YOLOv5Dataset,',
-      '            label_field=<span class="str">"ground_truth"</span>, classes=MY_CLASSES)'
-    ].join('\n'))}
-    <p><strong>Decisión:</strong> un subset (~4 GB) en vez de COCO completo (~20 GB). El modelo base ya vio COCO entero; solo necesita suficientes ejemplos para no olvidar, y clases como <em>pizza</em> o <em>toaster</em> no aportan a la navegación.</p>
-    <p>Entrenamiento: <code>uv run python scripts/train.py --model yolo26s.pt --data data/nav_combined/dataset.yaml --epochs 50</code>, sin <code>freeze</code>. Unos 122 s por época en la RTX 5060 Ti.</p>`,
-    chips:['39d1a9e fine-tuning strategy guide','8883995 track yolo26s_nav.pt']},
-    {tag:'medir', h:'0.47 de mAP50, con mucha dispersión por clase', body:`${stats([{num:'0.470', lbl:'mAP50'},{num:'0.311', lbl:'mAP50-95'},{num:'0.558', lbl:'precision'},{num:'0.462', lbl:'recall'}])}
-    ${table(['Clase','mAP50','Lectura'],[
-      ['Cat (COCO)','0.853','fuerte'],
-      ['Fire hydrant (COCO)','0.748','fuerte'],
-      ['Person (COCO)','0.738','fuerte'],
-      ['Wheelchair','0.696','la mejor de las propias'],
-      ['Tree','0.497',''],
-      ['Truck (COCO)','0.418','bajó respecto al modelo base'],
-      ['Traffic sign','0.417',''],
-      ['Door','0.410','mucha variedad interior/exterior'],
-      ['Stairs','0.318','crítica para el producto'],
-      ['Street light','0.044','solo 7 imágenes en validación']
-    ], [6,8,9])}
-    <p>La mejor época fue la 37 de 50: las 13 restantes no aportaron.</p>`,
-    chips:['6107f4e training results']},
-    {tag:'mirar', h:'Lo que haría distinto', body:`${caveat('Tres límites que hay que decir en voz alta', `<p><strong>1. Street light con 0.044 no es una métrica:</strong> con 7 imágenes de validación el número es ruido.</p><p><strong>2. Nunca evalué con vídeo de las gafas.</strong> La validación mezcla COCO y Open Images, no el dominio real donde se usa el modelo.</p><p><strong>3. El paso de combinar datasets no está en un script.</strong> Descargar, copiar, añadir prefijos y remapear se hizo a mano siguiendo la guía. Hoy no podría regenerar <code>nav_combined</code> con un solo comando.</p>`)}
+    {tag:'entender', h:'Qué es cuantizar', body:`<p>Pasar pesos y activaciones de coma flotante a enteros de 8 bits. Cada tensor necesita una <strong>escala</strong>, que se obtiene <strong>calibrando</strong> con imágenes reales. <strong>PTQ</strong> hace esto sobre un modelo ya entrenado; <strong>QAT</strong> simula el redondeo durante el entrenamiento para que la red lo compense.</p>
+    ${explain('Criterio escrito el 16 de septiembre, antes de medir', `<p>INT8 sustituye a FP16 solo si: el p95 baja al menos un 20 %, el mAP50 cae como máximo 0,01 y <code>Stairs</code> como máximo 0,02.</p>`)}`},
+    {tag:'simular', h:'Dos trampas en el INT8 por defecto', body:`<p>Leyendo el código de Ultralytics 8.4.14: por defecto <strong>calibra con el split de validación</strong>, el mismo con el que luego se evalúa, y construye el engine solo con el flag INT8, así que <strong>las capas no cuantizadas vuelven a FP32</strong>, no a FP16. Además usa el calibrador MinMax, sensible a valores extremos.</p>`},
+    {tag:'escribir', h:'Dos vías', body:`<p><strong>Implícita</strong> (<code>int8=True</code>): calibrando con 1 000 imágenes de train. <strong>Explícita</strong>: NVIDIA ModelOpt escribe un ONNX con nodos Q/DQ una sola vez, y cada dispositivo construye su engine INT8 + FP16 desde ese mismo fichero, con las mismas escalas.</p>`},
+    {tag:'medir', h:'Resultados', body:`${table(['Dispositivo · modelo','FP16 engine','INT8 engine','mAP50 FP16 → INT8','Stairs FP16 → INT8'], [
+      ['RTX · nano (implícita)','0.62 ms','0.84 ms','0.394 → 0.376','0.225 → 0.240'],
+      ['RTX · small (implícita)','1.06 ms','1.21 ms','0.463 → 0.415','0.385 → 0.311'],
+      ['Jetson · nano (Q/DQ)','4.06 ms','4.35 ms','0.394 → 0.371','0.225 → 0.265'],
+      ['Jetson · small (Q/DQ)','6.67 ms','5.10 ms','0.463 → 0.400','0.391 → 0.186']
+    ], [1,3])}
     <ul>
-      <li><strong>Hipótesis sobre Truck, no verificada: etiquetas ausentes.</strong> Las imágenes de Open Images solo tienen etiquetadas mis 6 clases. Si en una aparece un camión, entra como fondo y el modelo aprende a no detectarlo. Lo mismo con puertas sin etiquetar en fotos de COCO.</li>
-      <li><strong>Siguientes pasos:</strong> script reproducible para el dataset, más datos para Stairs y Street light, <code>patience=10</code> con 100 épocas, probar <code>yolo26m</code> y un conjunto de test con vídeo real.</li>
-    </ul>`}
+      <li>La implícita <strong>no se construye</strong> con TensorRT 10.3 (Jetson): aserción interna <code>checkSanity</code>, un bug conocido.</li>
+      <li>La Q/DQ <strong>no se construye</strong> con TensorRT 10.16 en la RTX (Blackwell): <code>MyelinCheckException</code>, otro bug conocido. En la Jetson sí.</li>
+      <li>Ninguna combinación pasa el criterio. Los fallos quedan registrados con el error real.</li>
+    </ul>`},
+    {tag:'mirar', h:'Mira por clase', body:`${caveat('Una caída que el mAP global esconde', `<p>Pasar el nano a FP16 cuesta 0,002 de mAP50 global, pero <code>Stairs</code> cae de 0,316 a 0,225, <strong>igual en los dos dispositivos</strong>. Y PTQ INT8 hunde <code>Stairs</code> del small de 0,391 a 0,186. Si solo mirase el global, habría aprobado ambas.</p>`)}`}
   ],
   qa: [
-    {q:'¿Por qué no congelar el backbone y entrenar solo una cabeza nueva con las 6 clases?', a:`<p>Porque la cabeza nueva tendría 6 salidas y el modelo dejaría de detectar personas y coches, que también hacen falta. <code>freeze</code> conserva las features aprendidas, no las clases. Para un único modelo con 24 clases hay que entrenar con las 24 a la vez. La alternativa sería dos modelos en paralelo, a costa de duplicar la latencia y la memoria.</p>`},
-    {q:'Street light tiene mAP50 de 0.044. ¿El modelo es malo detectando farolas?', a:`<p>No lo sé, y ese es el punto. Con 7 imágenes de validación, acertar o fallar dos cambia el número por completo. Antes de concluir nada necesito cientos de ejemplos de validación. Saber cuándo una métrica no es fiable importa tanto como el número.</p>`},
-    {q:'Mezclo imágenes donde solo están etiquetadas algunas clases. ¿Qué problema tiene?', a:`<p>Etiquetas ausentes: un objeto real sin caja se trata como fondo, y el modelo aprende a suprimirlo. Una foto de Open Images con un camión sin etiquetar penaliza detectar camiones. Creo que explica parte de la caída de Truck, pero no lo he medido. Se mitiga pseudo-etiquetando las clases de COCO en las imágenes propias con el modelo base, revisándolas, o filtrando imágenes con objetos sin etiquetar.</p>`}
+    {q:'¿Por qué INT8 puede ser más lento que FP16?', a:`<p>Si las capas sin kernel INT8 corren en FP32, hay conversiones de formato entre capas y cálculo en la precisión más cara. Y en modelos pequeños el ahorro de INT8 es pequeño frente a ese coste.</p>`},
+    {q:'¿Cuándo usaría INT8 en una Jetson?', a:`<p>FP16 por defecto. INT8 cuando el modelo es grande y la GPU es el cuello (VLM, profundidad), cuando no cabe en memoria o cuando se usa DLA (que el Orin Nano no tiene), siempre validado por clase y mejor con cuantización mixta o QAT.</p>`},
+    {q:'¿Qué pasa si calibro con los datos de validación?', a:`<p>Las escalas se ajustan a las mismas imágenes con las que luego mido, así que la evaluación queda optimista. Es una fuga, como entrenar con el test.</p>`}
   ]
 },
 
-/* ───────────────────────── 5 · VELOCIDAD ───────────────────────── */
+/* 5 · JETSON */
 {
-  id: 'velocidad', label: 'Medir velocidad sin engañarse', date: '20–21 feb 2026 · 6de1edd, 6107f4e',
-  focus: ['exportar','verificar'],
-  title: 'TensorRT FP16, y cómo se mide para que el número signifique algo',
-  sub: 'El modelo corre junto a otros (profundidad, mirada) en la misma GPU, así que cada milisegundo cuenta. Exportar a TensorRT es fácil. Medir bien es la parte donde es fácil equivocarse.',
+  id: 'jetson', label: 'La red no es el cuello', date: '17 sep 2026',
+  focus: ['desplegar','medir'],
+  title: 'En la Jetson, la red tarda 4 ms y el sistema 23',
+  sub: 'Nano y small parecían igual de rápidos en la Jetson. No cuadraba con que el small tiene varias veces más cálculo. Midiendo el engine aislado apareció el motivo.',
   beats: [
-    {tag:'entender', h:'Presupuesto de latencia, no FPS de folleto', body:`<p>En AriaGuard el detector comparte GPU con otros modelos. Importa cuántos milisegundos consume por frame y lo estable que es, más que el pico de FPS. TensorRT compila el modelo para una GPU concreta: fusiona capas, elige kernels y usa FP16.</p>`},
-    {tag:'simular', h:'Una iteración de benchmark, con y sin sincronizar', body:`${fig(`
-      <text class="s-d" x="16" y="22">sin torch.cuda.synchronize()</text>
-      <rect class="s-box" x="16" y="30" width="60" height="22" rx="3"/><text class="s-d" x="46" y="45" text-anchor="middle">CPU</text>
-      <rect class="s-box-bad" x="80" y="58" width="300" height="22" rx="3"/><text class="s-bad" x="230" y="73" text-anchor="middle">GPU trabajando…</text>
-      <line x1="16" y1="90" x2="80" y2="90" style="stroke:var(--danger)" stroke-width="2"/><text class="s-bad" x="90" y="94">reloj parado aquí → "0.4 ms" = falso</text>
-      <text class="s-d" x="16" y="128">con synchronize()</text>
-      <rect class="s-box" x="16" y="136" width="60" height="22" rx="3"/><text class="s-d" x="46" y="151" text-anchor="middle">CPU</text>
-      <rect class="s-box-ok" x="80" y="164" width="300" height="22" rx="3"/><text class="s-ok" x="230" y="179" text-anchor="middle">GPU trabajando…</text>
-      <line x1="16" y1="196" x2="380" y2="196" style="stroke:var(--ok)" stroke-width="2"/><text class="s-ok" x="390" y="200">reloj parado cuando la GPU termina → real</text>
-    `, '0 0 700 214', 'Ilustrativo. Las llamadas a la GPU son asíncronas: Python vuelve en cuanto el trabajo está encolado. Sin sincronizar, el cronómetro mide lo que tarda en encolarse, no la inferencia.', 'Línea de tiempo CPU y GPU con y sin sincronización')}
-    <p>El <strong>warmup</strong> resuelve el problema contrario. Las primeras llamadas incluyen cargar el engine, reservar memoria y ajustar kernels, y pueden tardar cientos de ms. Si entran en la media, la inflan.</p>`},
-    {tag:'escribir', h:'El bucle de medida', body:`${code('scripts/benchmark.py','benchmark_model', [
-      'dummy_img = np.random.randint(<span class="num">0</span>, <span class="num">255</span>, (imgsz, imgsz, <span class="num">3</span>), dtype=np.uint8)',
-      '',
-      '<span class="kw">for</span> _ <span class="kw">in</span> range(warmup):                 <span class="c1"># se ejecutan y se descartan</span>',
-      '    model(dummy_img, verbose=<span class="kw">False</span>)',
-      'torch.cuda.synchronize()',
-      '',
-      '<span class="kw">for</span> _ <span class="kw">in</span> range(iterations):',
-      '    start = time.perf_counter()',
-      '    model(dummy_img, verbose=<span class="kw">False</span>)',
-      '    torch.cuda.synchronize()               <span class="c1"># esperar a la GPU antes de parar el reloj</span>',
-      '    times.append(time.perf_counter() - start)',
-      '',
-      '<span class="kw">return</span> {<span class="str">"mean"</span>: ..., <span class="str">"std"</span>: ..., <span class="str">"median"</span>: ..., <span class="str">"fps"</span>: <span class="num">1000</span> / np.mean(times_ms)}'
-    ].join('\n'))}
-    <p>Export: <code>uv run python scripts/export_tensorrt.py --format engine --half</code>.</p>`},
-    {tag:'medir', h:'YOLO26m en RTX 5060 Ti (200 iteraciones, 20 de warmup)', body:`${table(['Formato','Media','Std','FPS','vs PyTorch'],[
-      ['PyTorch','8.86 ms','0.19 ms','112.9','1.0×'],
-      ['ONNX (CPU, no válido)','177.06 ms','10.55 ms','5.6','—'],
-      ['TensorRT FP16','3.02 ms','0.03 ms','331.3','2.9×']
-    ], [1])}
-    ${stats([{num:'2.9×', lbl:'más rápido que PyTorch', good:true},{num:'110 → 52 W', lbl:'potencia en pico'},{num:'451', lbl:'FPS · YOLO26s FP16 (nav)'}])}
-    <p>En pico, TensorRT también consumió menos potencia: 52 W frente a 110 W, según <code>nvidia-smi dmon</code>.</p>`,
-    chips:['6de1edd benchmark guide','6107f4e 451 FPS yolo26s_nav']},
-    {tag:'mirar', h:'Qué no dice este benchmark', body:`${caveat('Límites del número', `<p><strong>Imagen de ruido aleatorio:</strong> no hay decodificación de cámara ni objetos reales, así que casi no hay detecciones. En un vídeo real el tiempo por frame será mayor.</p><p><strong>El 451 FPS no tiene procedimiento registrado.</strong> Aparece en las notas del proyecto, pero no hay comando, commit ni log que lo acompañe. El método documentado es el del 331 FPS (YOLO26m). Hoy no puedo reproducir exactamente ese 451.</p><p><strong>La fila ONNX es inválida:</strong> corrió en CPU porque faltaba <code>onnxruntime-gpu</code>. Compararla con las de GPU no tiene sentido.</p>`)}
-    <ul>
-      <li><strong>Solo media y std.</strong> Para un sistema de seguridad importa la cola: añadiría p95 y p99. AriaGuard lo hizo después.</li>
-      <li><strong>No medí la precisión del engine FP16</strong> frente al <code>.pt</code>. FP16 suele perder muy poco, pero "suele" no es un dato. Correría <code>yolo val</code> con los dos.</li>
-      <li><strong>GPU de escritorio</strong>, no el Jetson de destino.</li>
-      <li><strong>Regla que me llevo:</strong> cada número va con su comando, su commit y su hardware.</li>
-    </ul>`}
+    {tag:'entender', h:'Una anomalía', body:`<p>FP16 extremo a extremo: nano 22,9 ms, small 23,3 ms. Si la GPU fuese el límite, el small tendría que notarse. Hipótesis: el cuello está en la CPU (pre-proceso, Python, escalado de frecuencia).</p>`},
+    {tag:'simular', h:'Dónde se van los 22,9 ms', body:`${fig(latencyBarSvg({pre:'pre-proceso (CPU)', engine:'engine', wrap:'código alrededor', post:'post-proceso', other:'resto'}), '0 0 900 110', 'Nano FP16 en la Jetson, medido. El engine (verde) es 4,1 ms; el pre-proceso en CPU, el código de Ultralytics alrededor del engine y el post-proceso suman el resto.', 'Barra de latencia del nano FP16 en Jetson')}`},
+    {tag:'medir', h:'Confirmado dos veces', body:`${table(['Jetson · FP16','Engine solo','Extremo a extremo'], [['nano','4.06 ms','22.89 ms'],['small','6.67 ms','23.32 ms']])}
+    <p>Medido con la API de TensorRT desde el benchmark y con <code>trtexec</code> de NVIDIA: coinciden con ±0,1 ms. En AriaGuard pasaba lo mismo: ~19 FPS con la GPU al 50-74 %.</p>`},
+    {tag:'mirar', h:'Qué optimizar primero', body:`<p>Antes que un modelo más rápido: <code>jetson_clocks</code>, quitar el escritorio, pre-proceso en GPU y, al final, un pipeline en C++ directo a TensorRT. Y recordar que la Jetson tiene <strong>memoria unificada</strong>: no hay VRAM que reservar.</p>`}
   ],
   qa: [
-    {q:'¿Por qué llamo a torch.cuda.synchronize() dentro del bucle?', a:`<p>Porque las operaciones de GPU son asíncronas respecto a la CPU. Sin sincronizar, <code>perf_counter()</code> se para cuando el trabajo está encolado, no terminado, y mides tiempos irrealmente bajos. Sincronizar antes de parar el reloj asegura medir la inferencia completa.</p>`},
-    {q:'¿Para qué sirve el warmup?', a:`<p>Las primeras inferencias incluyen costes únicos: cargar el engine, reservar memoria y ajustar kernels. Pueden tardar cientos de ms frente a ~3 ms en régimen estable. Si entran en la media la inflan, y como FPS = 1000/media, el error se propaga. Se ejecutan y se descartan.</p>`},
-    {q:'¿TensorRT FP16 pierde precisión? ¿Lo he medido?', a:`<p>Puede perder un poco por redondeo en capas sensibles. En este repo no hay registro de haber comparado el mAP del <code>.engine</code> con el del <code>.pt</code>, así que no puedo afirmar nada. Es lo primero que haría antes de desplegar: <code>yolo val</code> con ambos sobre el mismo conjunto.</p>`}
+    {q:'¿Pero CUDA no está ya muy optimizado?', a:`<p>Sí: esos 4 ms son CUDA y TensorRT. Lo lento es lo que corre en la CPU antes y después, en núcleos Cortex-A78AE mucho más lentos que una CPU de escritorio, con Python en un solo hilo.</p>`},
+    {q:'¿Más modelos necesitan más GPU?', a:`<p>En general sí, pero manda el recurso que se agota primero. Cuenta la frecuencia de cada modelo, la memoria por proceso (un contexto CUDA cada uno) y la CPU del pipeline. Hoy, en esta Jetson, se agota la CPU.</p>`}
   ]
 },
 
-/* ───────────────────────── 6 · METODOLOGÍA ───────────────────────── */
+/* 6 · STAIRS */
 {
-  id: 'metodologia', label: 'Construir, verificar, desplegar', date: 'dic 2025 → jul 2026 · 5f0e9d4, 7c671ca',
-  focus: ['verificar','usar','framework'],
-  title: 'Qué significa "funciona" en un repo de ML',
-  sub: 'Que el código no falle, que los datos sean válidos, que el modelo cumpla y que corra donde se usa son cuatro cosas distintas. Esta fase cuenta qué se verifica hoy y qué no.',
+  id: 'stairs', label: 'Autoanotar escaleras', date: '16–17 sep 2026 · prerregistrado',
+  focus: ['anotar','dataset','entrenar','evaluar','verificar'],
+  title: '¿Cuánto vale etiquetar con un texto?',
+  sub: 'Stairs es la clase más importante para una persona ciega y de las más débiles. Grounding DINO puede etiquetar escaleras a partir de la palabra «stairs». El experimento mide qué cuesta ese atajo.',
   beats: [
-    {tag:'entender', h:'Cuatro preguntas distintas', body:`${table(['Pregunta','Cómo se responde aquí','Estado'],[
-      ['¿El código hace lo que dice?','pytest unitario (anotar, split, visualizar)','sí'],
-      ['¿Los datos son válidos?','tests de integridad del dataset','sí, en local'],
-      ['¿El modelo es bueno?','evaluate.py + results.csv','manual'],
-      ['¿Corre donde se usa?','export TensorRT + benchmark','manual, sin CI']
-    ])}`},
-    {tag:'simular', h:'Un clon limpio, antes y después del fix', body:`${fig(`
-      <text class="s-d" x="16" y="22">antes · uv sync --extra dev && pytest</text>
-      <rect class="s-box" x="16" y="30" width="170" height="40" rx="6"/><text class="s-t" x="101" y="55" text-anchor="middle">recolectar tests</text>
-      <line class="s-line" x1="186" y1="50" x2="222" y2="50" marker-end="url(#arrow)"/>
-      <rect class="s-box-bad" x="226" y="30" width="270" height="40" rx="6"/><text class="s-bad" x="361" y="55" text-anchor="middle">import transformers → ERROR</text>
-      <line class="s-line" x1="496" y1="50" x2="532" y2="50" marker-end="url(#arrow)"/>
-      <rect class="s-box-bad" x="536" y="30" width="300" height="40" rx="6"/><text class="s-bad" x="686" y="55" text-anchor="middle">run abortado · 45 tests ocultos</text>
-      <text class="s-d" x="16" y="104">después · 7c671ca</text>
-      <rect class="s-box" x="16" y="112" width="170" height="40" rx="6"/><text class="s-t" x="101" y="137" text-anchor="middle">dev incluye annotation</text>
-      <line class="s-line" x1="186" y1="132" x2="222" y2="132" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="226" y="112" width="270" height="40" rx="6"/><text class="s-t" x="361" y="137" text-anchor="middle">sin data/ → skip · incompleto → fail</text>
-      <line class="s-line" x1="496" y1="132" x2="532" y2="132" marker-end="url(#arrow)"/>
-      <rect class="s-box-ok" x="536" y="112" width="300" height="40" rx="6"/><text class="s-ok" x="686" y="137" text-anchor="middle">45 passed · 9 skipped</text>
-    `, '0 0 850 166', 'Un solo error al recolectar tests aborta toda la ejecución, y un repo sano parece roto. El fix hace que el extra dev instale lo que importan los tests y que los tests de datos se salten si no hay dataset.', 'Flujo de pytest antes y después del fix')}`},
-    {tag:'escribir', h:'El ciclo completo, con sus puertas', body:`${fig(`
-      ${[['Construir','uv · config.yaml','s-box'],['Verificar','pytest','s-box-ok'],['Entrenar','train.py','s-box'],['Evaluar','mAP por clase','s-box'],['Exportar','TensorRT','s-box'],['Desplegar','AriaGuard','s-box']].map(([t,d,c],i)=>{
-        const x = 16 + i*146;
-        return `<rect class="${c}" x="${x}" y="24" width="126" height="54" rx="7"/>
-        <text class="s-t" x="${x+63}" y="47" text-anchor="middle">${t}</text><text class="s-d" x="${x+63}" y="65" text-anchor="middle">${d}</text>
-        ${i<5?`<line class="s-line" x1="${x+126}" y1="51" x2="${x+143}" y2="51" marker-end="url(#arrow)"/>`:''}`;}).join('')}
-      <text class="s-bad" x="162" y="100" text-anchor="middle">puerta: tests en verde</text>
-      <text class="s-bad" x="600" y="100" text-anchor="middle">puerta: mAP ≥ anterior (manual)</text>
-      <text class="s-d" x="455" y="124" text-anchor="middle">entregable: models/yolo26s_nav.pt en git → cada máquina compila su .engine</text>
-    `, '0 0 900 136', 'La metodología real. Solo la primera puerta es automática en local, y ninguna corre en CI.', 'Ciclo construir, verificar, entrenar, evaluar, exportar, desplegar')}
-    ${code('tests/test_data_integrity.py','skip si falta · fallar si está incompleto', [
-      '<span class="kw">def</span> <span class="fn">test_train_structure</span>(<span class="kw">self</span>, data_dir):',
-      '    dataset_dir = data_dir / <span class="str">"dataset"</span>',
-      '    <span class="kw">if not</span> dataset_dir.exists():',
-      '        pytest.skip(<span class="str">"data/dataset/ not found (gitignored local artifact)"</span>)',
-      '    <span class="c1"># si existe, se exige la estructura completa</span>'
-    ].join('\n'))}
-    <p><strong>Decisión:</strong> versionar <code>yolo26s_nav.pt</code> (20 MB) en git porque es el único artefacto que no se puede regenerar sin reentrenar. El <code>.engine</code> no se versiona: depende de la GPU y de la versión de TensorRT.</p>`,
-    chips:['5f0e9d4 test suite (47 tests)','7c671ca unblock collection','8883995 track model']},
-    {tag:'medir', h:'Qué cubren los tests', body:`${table(['Archivo','Qué comprueba'],[
-      ['test_auto_annotate.py','NMS, formato YOLO, template matching'],
-      ['test_split_dataset.py','parejas imagen/label, proporciones'],
-      ['test_visualize.py','carga de anotaciones, conversión a píxeles'],
-      ['test_grounding_dino.py','anotador zero-shot'],
-      ['test_data_integrity.py','estructura, formato y rangos de coordenadas'],
-      ['test_integration.py','configs, modelos, script de inferencia']
-    ])}
-    ${stats([{num:'45', lbl:'passed', good:true},{num:'9', lbl:'skipped (sin data/)'},{num:'0', lbl:'jobs de CI'}])}`},
-    {tag:'mirar', h:'Huecos de ingeniería', body:`${caveat('Lo que falta para llamarlo robusto', `<p><strong>Sin CI:</strong> quité el pipeline de GitHub Actions en agosto de 2026, así que hoy nada impide mergear con tests en rojo.</p><p><strong>Los tests de datos nunca corren fuera de mi máquina.</strong> Un test que siempre se salta en CI no protege. Falta un mini-dataset de ejemplo en <code>tests/fixtures</code>.</p><p><strong>Sin regresión de modelo:</strong> nada comprueba que un reentrenamiento no empeore el mAP.</p>`)}
-    <ul>
-      <li><strong>Sin demo desplegada:</strong> <code>app.py</code> ya es Gradio. Un Hugging Face Space en CPU con imágenes sería viable.</li>
-      <li><strong>Modelo en git</strong> en vez de Hugging Face Hub o una Release con model card. Es aceptable para uno, pero no escala.</li>
-      <li><strong>Sin Docker ni archivo LICENSE</strong>, aunque <code>pyproject</code> declara MIT.</li>
-    </ul>`}
+    {tag:'entender', h:'Diseño y criterio antes de nada', body:`<p>Tres modelos nano con la misma receta: <strong>A</strong> base; <strong>B</strong> + 1 000 imágenes de escaleras con etiquetas de Grounding DINO; <strong>C</strong> + las mismas imágenes con etiquetas humanas. El diseño y el criterio se hicieron commit antes de entrenar.</p>
+    ${explain('Criterio', `<p>La autoanotación vale la pena si la ganancia de B es al menos la mitad de la de C, C gana al menos 0,02 y B no empeora el resto más de 0,01.</p>`)}`},
+    {tag:'simular', h:'Calidad de las pseudo-etiquetas', body:`<p>Contra las cajas humanas, con IoU ≥ 0,5: <strong>precisión 0,59</strong> (4 de cada 10 cajas sobran) y <strong>recall 0,72</strong>. 1 554 cajas frente a 1 291 humanas; 17 imágenes sin ninguna.</p>`},
+    {tag:'medir', h:'Resultado', body:`${fig(stairsBarsSvg(['A · base','B · autoanotadas','C · humanas']), '0 0 600 185', 'AP50 de Stairs en el set de test (120 imágenes, 140 instancias). B captura 0,079 de los 0,126 que gana C.', 'Barras de AP50 de Stairs por brazo')}
+    <p>B gana <strong>+0,079</strong>, C <strong>+0,126</strong>: la autoanotación captura el <strong>63 %</strong> y no empeora el global (0,398 frente a 0,396). <strong>Pasa el criterio.</strong> Con AP50-95, B y C quedan a 0,005: las cajas automáticas son ajustadas; lo que falla son escaleras de más o de menos.</p>`},
+    {tag:'mirar', h:'Límites', body:`${caveat('No generalizar de más', `<p>Una semilla por brazo; 140 instancias de test (el split test de Open Images no tenía más); fotos, no vídeo en primera persona. En val (45 instancias) B supera a C, lo que muestra por qué el test era la métrica principal.</p>`)}`}
   ],
   qa: [
-    {q:'¿Por qué versiono el .pt en git y no el .engine?', a:`<p>El <code>.pt</code> es el resultado de horas de entrenamiento y no se regenera sin repetirlo. El <code>.engine</code> es una compilación específica de una GPU y una versión de TensorRT: un engine de mi RTX no sirve en un Jetson. Se versiona la fuente portable y cada destino compila la suya. A más escala usaría Hugging Face Hub o Releases con versión y model card.</p>`},
-    {q:'Un test que se salta cuando falta data/, ¿no es un test que nunca falla?', a:`<p>En CI, sí, y es su debilidad. En local tiene valor: se salta si no hay dataset, pero falla si hay uno incompleto, y lo verifiqué creando uno parcial. La solución completa es un dataset diminuto en <code>tests/fixtures</code> para que la lógica de validación corra siempre.</p>`},
-    {q:'¿Qué añadiría primero para que esto sea "producción"?', a:`<p>En orden: CI con pytest en CPU, un fixture de datos pequeño, un script reproducible para construir el dataset y una evaluación de regresión que compare mAP por clase contra el modelo anterior antes de publicar uno nuevo. Después, la demo y el model card.</p>`}
+    {q:'¿Por qué no hice que un humano revisara las etiquetas automáticas?', a:`<p>Porque el diseño ya tenía etiquetas humanas de referencia para esas imágenes: se puede medir la calidad del autoanotador exactamente, sin trabajo manual.</p>`},
+    {q:'¿Qué es prerregistrar y por qué importa?', a:`<p>Escribir el diseño y la regla de decisión antes de ver resultados. Evita elegir a posteriori la métrica que dé la conclusión que me gusta. El commit del documento es anterior a cualquier resultado.</p>`}
   ]
 },
 
-/* ───────────────────────── 7 · MIRAR ATRÁS ───────────────────────── */
+/* 7 · MIRAR ATRÁS */
 {
   id: 'mirar-atras', label: 'Mirar atrás: qué cambiaría', date: 'sep 2026', focus: 'all',
-  title: 'Lo que convierte "lo resolví" en "aprendí algo"',
-  sub: 'El último paso del método, aplicado al proyecto entero.',
+  title: 'Lo que haría distinto la próxima vez',
+  sub: 'El proyecto empezó como otra cosa y creció a trozos. Estas son las lecciones que me llevo a los siguientes.',
   intro: `
-  ${fig(`
-    ${[['1','Split sin fuga','por vídeo o escena','s-box-bad'],['2','Script del dataset','nav_combined reproducible','s-box-bad'],['3','Test con vídeo real','de las gafas','s-box-bad'],['4','CI + fixtures','pytest en cada push','s-box'],['5','Demo + model card','HF Space / Hub','s-box']].map(([n,t,d,c],i)=>{
-      const x = 16 + i*178;
-      return `<rect class="${c}" x="${x}" y="20" width="160" height="70" rx="7"/>
-      <text class="s-d" x="${x+12}" y="38">${n}</text>
-      <text class="s-t" x="${x+80}" y="58" text-anchor="middle">${t}</text>
-      <text class="s-d" x="${x+80}" y="76" text-anchor="middle">${d}</text>`;}).join('')}
-    <text class="s-bad" x="270" y="112" text-anchor="middle">afectan a si los números son ciertos</text>
-    <text class="s-d" x="712" y="112" text-anchor="middle">afectan a la madurez</text>
-  `, '0 0 910 124', 'Prioridades si empezara hoy. Las tres primeras van antes porque sin ellas las métricas de esta página no son del todo fiables.', 'Cinco prioridades ordenadas')}
-  <div class="pitch">
-    <span class="lbl">Qué aprendí</span>
-    <p><strong>1. Las etiquetas son el proyecto.</strong> Entrenar es un comando; conseguir, remapear y validar etiquetas es donde se va el tiempo y donde se esconden los errores silenciosos.</p>
-    <p><strong>2. Un número sin procedimiento no vale.</strong> El 98.7% tenía fuga, el "43× mejor" contaba cajas y el 451 FPS no se puede reproducir. Ahora cada métrica va con su comando, su commit y su hardware.</p>
-    <p><strong>3. La media esconde lo que importa.</strong> Los pilares invertidos, Stairs y el p95: el caso crítico hay que medirlo por separado.</p>
-    <p><strong>4. Los errores silenciosos son los caros.</strong> Un <code>except</code> amplio, un ID mal remapeado o un split aleatorio no fallan: dan un resultado equivocado que parece correcto.</p>
-  </div>`,
+  ${table(['Lección','Por qué'], [
+    ['Dataset por código desde el día 1','Reconstruir después me obligó a hacer arqueología de descargas'],
+    ['Métrica por clase desde el principio','El global aprobaba cambios que hundían Stairs'],
+    ['Medir el engine aislado desde el principio','Sin él, atribuí a la GPU un límite que era de la CPU'],
+    ['No fiarse del INT8 por defecto de una librería','Calibraba con validación y dejaba capas en FP32'],
+    ['Criterio escrito antes de medir','Evita ajustar la conclusión a los números'],
+    ['Registrar también los fallos','Dos bugs de TensorRT son hallazgos, no huecos en la tabla']
+  ])}
+  ${explain('Siguiente', `<p>Pipeline más rápido antes que modelo más rápido (pre-proceso en GPU, C++); INT8 que conserve precisión (mixta o QAT) solo cuando el engine domine; JetPack 7.2.1 en la Jetson; un set de test en primera persona con grabaciones abiertas de Aria.</p>`)}
+  `,
   beats: [],
-  qa: [
-    {q:'Si empezara de cero, ¿qué haría distinto desde el primer día?', a:`<p>Diseñar la evaluación antes que el modelo: un split sin fuga, un conjunto de test del dominio real (vídeo de las gafas) y métricas por clase para las que importan al producto. En este proyecto la evaluación llegó después y por eso algunos números son optimistas.</p>`},
-    {q:'¿Qué haría con una semana más?', a:`<p>Día 1–2: script reproducible de <code>nav_combined</code> y split corregido. Día 3: grabar y etiquetar un test de vídeo real. Día 4: reentrenar con <code>patience</code> y comparar YOLO26s con YOLO26m en ese test. Día 5: CI, fixture de datos y model card. No añadiría ninguna funcionalidad nueva hasta tener los números bien medidos.</p>`},
-    {q:'¿De qué estoy más orgulloso, y cuál fue mi mayor error?', a:`<p>Orgulloso de la estrategia del dataset combinado y del flujo de anotación con revisión humana, que resuelven el problema real de conseguir datos. Mi mayor error fue dar por bueno un 98.7% con un split que filtraba frames. Es un error clásico; lo detecté al revisar el proyecto y por eso está explicado en la primera fase, no escondido.</p>`}
-  ]
-}
-/* ───────────────────────── 8 · GLOSARIO ───────────────────────── */
-,{
-  id: 'glosario', label: 'Conceptos: lo que me enseñó', date: '8 fases', focus: 'all', kicker: 'Glosario',
+  qa: []
+},
+
+/* 8 · GLOSARIO */
+{
+  id: 'glosario', label: 'Conceptos: lo que me enseñó', date: '7 fases', focus: 'all', kicker: 'Glosario',
   title: 'Glosario del proyecto',
   sub: 'Los conceptos de todas las fases en un solo sitio, para repasar y comprobar qué sé explicar.',
   intro: conceptsHtml('es'),
@@ -1497,459 +1252,205 @@ PAGE.steps.en = [
 /* 0 · SUMMARY */
 {
   id: 'resumen', label: 'The project in 2 minutes', date: 'Dec 2025 → Sep 2026', focus: 'all',
-  title: 'A 24-class obstacle detector, and the framework to train it',
-  sub: 'This page walks through how the project was built, phase by phase, with the real code and metrics, including the ones that went wrong. Use it to understand the project, relearn it and be able to explain it.',
+  title: 'An obstacle detector for walking blind, measured down to the edge',
+  sub: 'How AriaGuard\'s 24-class detector was built: a reproducible dataset, two model sizes, a benchmark with a methodology on an RTX and a Jetson, and a pre-registered auto-annotation experiment. What worked and what did not.',
   intro: `
   <div class="pitch">
     <span class="lbl">Pitch</span>
-    <p><strong>Problem.</strong> A blind pedestrian wearing camera glasses needs the system to detect doors, stairs, street lights or wheelchairs. Models pretrained on COCO don't know those classes.</p>
-    <p><strong>What I built.</strong> A Python framework that covers the whole loop: auto-annotate images from text (Grounding DINO), train YOLO26, evaluate, export to TensorRT and benchmark. With it I trained <code>yolo26s_nav</code>, a 24-class model used by AriaGuard.</p>
-    <p><strong>Honest result.</strong> It's fast (451 FPS with TensorRT FP16), but accuracy is modest: 0.47 mAP50. The classes that matter most for the product, like stairs, are among the weakest. I built it alone: 133 commits between December 2025 and September 2026.</p>
+    <p><strong>Problem.</strong> A blind person walking with camera glasses needs the system to see doors, stairs, street lights or wheelchairs. COCO has none of those, and the model has to run on a small device.</p>
+    <p><strong>What I did.</strong> A reproducible pipeline: a combined dataset (COCO + Open Images) pinned by image ID, YOLO26 nano and small, per-class evaluation, TensorRT FP16/INT8, and one benchmark protocol on an RTX 5060 Ti and a Jetson Orin Nano. Plus an experiment on whether auto-annotation fixes the weakest class.</p>
+    <p><strong>Honest result.</strong> FP16 wins on both devices; INT8 failed a criterion fixed before measuring. On the Jetson the network takes 4 ms and the system 23 ms: the CPU is the bottleneck. Auto-annotation recovered 63 % of what human labels give for <code>Stairs</code>.</p>
   </div>
   ${stats([
-    {num:'0.470', lbl:'mAP50 · 24 classes'},
-    {num:'0.311', lbl:'mAP50-95'},
-    {num:'451', lbl:'FPS · TensorRT FP16', good:true},
-    {num:'14K', lbl:'training images'}
+    {num:'4.1 ms', lbl:'nano FP16 engine · Jetson', good:true},
+    {num:'22.9 ms', lbl:'end to end · Jetson'},
+    {num:'+0.079', lbl:'Stairs AP50 from auto labels', good:true},
+    {num:'14,179', lbl:'images, rebuilt identically'}
   ])}
-  ${explain('How to read this page: the 5-step method', `<p>Every phase uses the same method, adapted from Pólya's <em>How to Solve It</em> (1945):</p>`)}
-  ${fig(`
-    ${[['1 · Understand','what the problem is'],['2 · Simulate','one case, real numbers'],['3 · Write','code and decision'],['4 · Measure','what happened, how'],['5 · Look back','what I would change']].map(([t,d],i)=>{
-      const x = 16 + i*186;
-      return `<rect class="s-box" x="${x}" y="20" width="160" height="56" rx="7"/>
-      <text class="s-t" x="${x+80}" y="44" text-anchor="middle">${t}</text>
-      <text class="s-d" x="${x+80}" y="62" text-anchor="middle">${d}</text>
-      ${i<4?`<line class="s-line" x1="${x+160}" y1="48" x2="${x+183}" y2="48" marker-end="url(#arrow)"/>`:''}`;}).join('')}
-    <path class="s-line" d="M 840 76 C 840 118, 96 118, 96 80" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
-    <text class="s-d" x="468" y="112" text-anchor="middle">what you learn feeds the next round</text>
-  `, '0 0 950 126', 'Pólya had four steps. "Devise a plan" becomes simulating one concrete case, and "look back" splits into measure and look back, because code can be run and can prove you wrong.', 'Five-step flow: understand, simulate, write, measure, look back, looping back')}
+  ${explain('How to read this site: the 5-step method', `<p>Each phase follows an adaptation of Pólya\'s <em>How to Solve It</em> (1945). Figures come from the JSON records in <code>benchmarks/</code>.</p>`)}
+  ${POLYA_FIG([['1 · Understand','what the problem is'],['2 · Simulate','one case with numbers'],['3 · Write','code and decision'],['4 · Measure','what came out, how'],['5 · Look back','what I would change']], 'Pólya had four steps. "Devising a plan" becomes simulating a concrete case, and "looking back" splits into measuring and looking back, because code can run and contradict you.', 'what I learn feeds the next loop')}
   `,
   beats: [],
   qa: [
-    {q:'How do I explain this project in two minutes?', a:`<p>In the order of the 5 steps. <strong>Understand:</strong> an assisted-navigation system needed classes COCO doesn't have, like doors or stairs. <strong>Simulate and write:</strong> you can't add classes to YOLO without it forgetting the original ones, so I combined a COCO subset with Open Images data, remapping class IDs, and built a framework to annotate, train and export. <strong>Measure:</strong> 451 FPS with TensorRT FP16, but 0.47 mAP50, with weak classes exactly where it matters. <strong>Look back:</strong> the dataset merge isn't scripted, I never evaluated on real footage from the glasses, and the first version's validation was leaky. That's what I'd fix first.</p>`},
-    {q:'What exactly did I do?', a:`<p>Everything: framing the problem, data, code, training runs and benchmarks. I'm the only author of the 133 commits. I used AI assistants for support, but the decisions and the validation of results are mine. That's why I can explain every number on this page, and its limits.</p>`}
+    {q:'How do I explain this project in two minutes?', a:`<p><strong>Understand:</strong> an assisted-navigation system needed classes COCO lacks. <strong>Key decision:</strong> a combined dataset, because fine-tuning replaces the head and forgets what it does not see. <strong>Measure:</strong> one protocol on RTX and Jetson, with percentiles, per-class metrics and the INT8 criterion written first. <strong>Results:</strong> FP16 everywhere; on the Jetson the CPU is the bottleneck (4 ms network, 23 ms system); auto-annotation captures 63 % of the hand-labelling gain.</p>`},
+    {q:'What is the most interesting part technically?', a:`<p>That <strong>speeding up the model did not speed up the system</strong>. Explicit INT8 cut the small engine from 6.7 to 5.1 ms on the Jetson and the total did not move, because ~17 ms are CPU. That changes what to optimize: the pipeline first (GPU pre-processing, C++), the network later.</p>`},
+    {q:'What would I do differently?', a:`<p>Build the dataset with code from day one, measure per class and the bare engine from the start, and not trust a library\'s default INT8. See "Look back".</p>`}
   ]
 },
 
-/* 1 · VR ORIGIN */
+/* 1 · DATASET */
 {
-  id: 'origen', label: 'The origin: a VR detector', date: 'Dec 3–8, 2025 · d319f58 → ae29ec0',
-  focus: ['datos','anotar','dataset','entrenar','evaluar'],
-  title: 'First, a single object in a virtual world',
-  sub: 'Before it was a framework, the project detected one object: pillars with a yellow-and-black checkerboard pattern inside an Unreal Engine scene. Almost every later problem showed up here first.',
+  id: 'dataset', label: '24 classes without forgetting COCO', date: 'Feb 2026 · Sep 2026 (reproducible)',
+  focus: ['datos','dataset'],
+  title: 'One dataset with everything, and rebuildable',
+  sub: 'Adding doors or stairs without losing people or cars needs one dataset with all 24 classes. For the results to count, that dataset has to come from code.',
   beats: [
-    {tag:'entender', h:'One video, zero labels', body:`<p>The starting point was a video captured in VR and a cropped image of the pillar. Labeling hundreds of frames by hand was slow, and the classic tool, LabelImg, crashed on Python 3.12 (<code>drawLine(): argument 1 has unexpected type 'float'</code>).</p>
-    <p>The real question wasn't how to train YOLO, but <strong>how to get labels without labeling by hand</strong>.</p>`},
-    {tag:'simular', h:'Template matching on one frame', body:`<p>The idea: slide the pillar image (the template) across the frame and score how similar each position is. Where the score passes a threshold, you have a detection.</p>
-    ${fig(`
-      <rect class="s-box" x="20" y="20" width="250" height="140" rx="6"/>
-      <text class="s-d" x="30" y="38">frame 1280×720</text>
-      <rect x="70" y="60" width="44" height="80" rx="3" fill="none" style="stroke:var(--accent)" stroke-width="2"/>
-      <rect x="180" y="60" width="44" height="80" rx="3" fill="none" style="stroke:var(--danger)" stroke-width="2" stroke-dasharray="4 3"/>
-      <text class="s-ok" x="92" y="154" text-anchor="middle">0.93</text>
-      <text class="s-bad" x="202" y="154" text-anchor="middle">0.74</text>
-      <line class="s-line" x1="270" y1="90" x2="320" y2="90" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="325" y="30" width="250" height="44" rx="6"/>
-      <text class="s-t" x="450" y="57" text-anchor="middle">threshold 0.70 → 2 hits</text>
-      <rect class="s-box-ok" x="325" y="96" width="250" height="44" rx="6"/>
-      <text class="s-t" x="450" y="123" text-anchor="middle">threshold 0.85 → 1 hit</text>
-      <text class="s-bad" x="450" y="170" text-anchor="middle">repeating checkerboard → false positives</text>
-    `, '0 0 600 180', 'Illustrative simulation with example values: the checkerboard repeats in places that aren\'t the pillar. At 0.70 those pass the filter; raising it to 0.85–0.95 removes them, at the cost of missing pillars seen at odd angles.', 'Template sliding over a frame with two scores and two thresholds')}
-    <p>The same reasoning explains the next failure: an <strong>inverted</strong> pillar, black on top, barely resembles the normal template and never passes the threshold. It needed a second template.</p>`},
-    {tag:'escribir', h:'One script per step, with a human reviewing', body:`<p>Each step is its own script. Human review (<code>review_annotations.py</code>) sits in the middle on purpose: auto-annotation proposes, a person decides.</p>
-    ${fig(`
-      ${pipelineSvg([['auto_annotate','template + NMS'],['visualize','inspect boxes'],['review','human accepts'],['split_dataset','80/20 seed 42'],['train · eval','YOLOv12s']])}
-      <path class="s-line" d="M 694 86 C 694 130, 104 130, 104 90" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
-      <text class="s-bad" x="400" y="126" text-anchor="middle">inverted pillars missed → new template → re-annotate</text>
-    `, '0 0 1000 140', 'The first version\'s flow. The return arrow is the real loop I had to go through when the model missed inverted pillars.', 'Five-script pipeline with a feedback loop')}
-    ${code('scripts/split_dataset.py','train/val split', [
-      '<span class="kw">def</span> <span class="fn">split_pairs</span>(pairs, train_ratio=<span class="num">0.8</span>, seed=<span class="num">42</span>):',
-      '    random.seed(seed)',
-      '    shuffled = pairs.copy()',
-      '    random.shuffle(shuffled)          <span class="c1"># ← frames from ONE video, shuffled</span>',
-      '    split_idx = int(len(shuffled) * train_ratio)',
-      '    <span class="kw">return</span> shuffled[:split_idx], shuffled[split_idx:]'
-    ].join('\n'))}`,
-    chips:['0ec9c97 auto-annotate template matching','f83a122 review_annotations','699d080 evaluate, export, benchmark']},
-    {tag:'medir', h:'Four training runs', body:`${table(['#','Model','Data','mAP50-95','Note'],[
-      ['1','YOLOv8n · 10 ep.','555 train','62.7%','baseline'],
-      ['2','YOLOv12s · 50 ep.','555 train','84.7%','+22 points from a bigger model'],
-      ['3','YOLOv12s · 100 ep.','+7 inverted','87.4%','not enough'],
-      ['4','YOLOv12s · 100 ep.','+59 inverted','87.4%','final']
-    ])}
-    ${stats([{num:'98.7%', lbl:'final mAP50'},{num:'99.2%', lbl:'recall'},{num:'71 → 180', lbl:'FPS PyTorch → TensorRT', good:true},{num:'RTX 2060', lbl:'6 GB'}])}
-    <p>The model produced "ghost" detections at 0.50–0.55 confidence, so I raised the inference threshold from 0.25 to 0.65.</p>`,
-    chips:['9d30375 TensorRT 180 FPS']},
-    {tag:'mirar', h:'That 98.7% is optimistic', body:`${caveat('Train/val leakage', `<p>Every frame comes from the same video and <code>split_pairs</code> shuffles them randomly. Consecutive frames are nearly identical, so the model was very likely validated on images it had practically seen in training. The 98.7% measures memory of that video, not generalization.</p><p><strong>What I'd do today:</strong> split by time blocks or scenes, never frame by frame.</p>`)}
-    <ul>
-      <li><strong>Adding 59 inverted frames didn't move mAP50-95</strong> (87.4% → 87.4%). Either validation had almost no inverted pillars, or the aggregate metric hid the case that mattered. I didn't check; I should have measured that subset on its own.</li>
-      <li><strong>Raising the threshold to 0.65 is a patch</strong>: it removes ghosts, and also real detections. The real fix is adding hard negative examples.</li>
-      <li><strong>What worked:</strong> auto-annotation plus human review. That idea survives through the whole project.</li>
-    </ul>`}
+    {tag:'entender', h:'Fine-tuning forgets', body:`<p>Training YOLO on a new dataset <strong>replaces the detection head</strong>. If the dataset only has the 6 new classes, the model stops detecting COCO\'s 80. Freezing the backbone does not prevent it: the head is still new.</p>`},
+    {tag:'simular', h:'Two sources, one ID space', body:`${fig(`
+      <rect class="s-box" x="20" y="20" width="230" height="58" rx="7"/><text class="s-t" x="135" y="44" text-anchor="middle">COCO 2017 · 18 classes</text><text class="s-d" x="135" y="64" text-anchor="middle">IDs 0-17 · 8,000 / 2,000</text>
+      <rect class="s-box" x="20" y="100" width="230" height="58" rx="7"/><text class="s-t" x="135" y="124" text-anchor="middle">Open Images V7 · 6 classes</text><text class="s-d" x="135" y="144" text-anchor="middle">IDs 0-5 → 18-23 · 3,608 / 571</text>
+      <line class="s-line" x1="250" y1="49" x2="330" y2="80" marker-end="url(#arrow)"/><line class="s-line" x1="250" y1="129" x2="330" y2="98" marker-end="url(#arrow)"/>
+      <rect class="s-box-ok" x="335" y="60" width="250" height="58" rx="7"/><text class="s-t" x="460" y="84" text-anchor="middle">nav_combined · 24 classes</text><text class="s-d" x="460" y="104" text-anchor="middle">11,608 train · 2,571 val</text>
+    `, '0 0 610 170', 'Classes COCO lacks (Door, Stairs, Street light, Traffic sign, Tree, Wheelchair) are shifted after COCO\'s 18 so no ID collides.', 'Combined dataset diagram')}`},
+    {tag:'escribir', h:'Manifests, not manual steps', body:`<p>The original dataset was assembled by hand and could not be reproduced. Rebuilding it I found the COCO rule (the first image IDs containing a navigation class), but not the Open Images one, which came from an earlier download. The fix: <strong>pin the exact IDs</strong> in <code>data_manifest/</code> and convert labels from the upstream annotations.</p>
+    ${code('scripts/build_dataset.py', 'usage', `uv run python scripts/build_dataset.py --out data/nav_rebuilt --verify data/nav_combined`)}`},
+    {tag:'medir', h:'Identical, in a minute', body:`<p>Rebuilt from scratch in ~1 minute: <strong>identical labels for all 14,179 images</strong> (tolerance 1e-4) and byte-identical images in a 600-image sample. So the published models needed no retraining.</p>
+    ${table(['Class (val)','Instances','Images'], [['person','6,404','1,511'],['Door','287','204'],['Wheelchair','117','48'],['Stairs','45','36'],['Street light','40','7']], [3,4])}`},
+    {tag:'mirar', h:'What the dataset does not fix', body:`${caveat('Partial labels', `<p>Open Images images do not label people or cars with COCO classes, and COCO images do not label doors or stairs. The model learns those objects are background in half the images. And <code>Stairs</code> has only 45 validation instances: its mAP is noisy.</p>`)}`}
   ],
   qa: [
-    {q:'My first model has 98.7% mAP50. Do I believe it?', a:`<p>Not really. The frames come from one video and the split is random frame by frame, so validation contains frames nearly identical to training ones. That's leakage. The number says the model recognizes that video, not that it works on another. To trust it I'd split by time blocks and test on a different recording.</p>`},
-    {q:'I raised the confidence threshold from 0.25 to 0.65. What did that cost?', a:`<p>Fewer false positives for lower recall: real pillars scoring between 0.25 and 0.65 stop being detected. In a pedestrian safety system, missing a real obstacle is worse than an extra warning. The right move is to pick the threshold from the validation precision-recall curve and fix the cause with negative examples, not set it by eye.</p>`},
-    {q:'I added 59 inverted-pillar frames and mAP50-95 didn\'t change. How do I read that?', a:`<p>An aggregate metric can hide the subgroup you care about. If validation has few inverted pillars, improving on them barely moves the average. What was missing is evaluating that subset separately. I didn't, and it's one of the lessons I took away.</p>`}
+    {q:'Why not train only the new classes and run two models?', a:`<p>Two models double compute and memory on a small device, and latencies add up. One 24-class model is cheaper at the edge. The price is partial labels.</p>`},
+    {q:'Why a COCO subset instead of all of COCO?', a:`<p>The base model was already pre-trained on full COCO; enough examples of the useful classes keep it from forgetting them. The 62 irrelevant classes (pizza, toaster) only add noise and time.</p>`},
+    {q:'How do I know the rebuilt dataset is the same?', a:`<p><code>--verify</code> compares every label file with a rounding tolerance, and tests check that images match the manifest exactly and that train and val do not overlap.</p>`}
   ]
 },
 
-/* 2 · ZERO-SHOT */
+/* 2 · TRAIN */
 {
-  id: 'zeroshot', label: 'Annotating without annotating', date: 'Dec 15, 2025 · a6bf6ad, 6b5a4a7',
-  focus: ['anotar'],
-  title: 'Describe the object in text instead of cropping it',
-  sub: 'With template matching, every new look of the object needs another template, and that doesn\'t scale. So I tried models that detect from a sentence: YOLO-World failed and Grounding DINO worked.',
+  id: 'entrenar', label: 'Nano and small, same recipe', date: 'Feb 2026 · Sep 2026',
+  focus: ['entrenar','evaluar'],
+  title: 'Two sizes for two roles',
+  sub: 'Nano is the edge target; small is the accuracy reference. Same data, same recipe, same seed, so size is the only difference.',
   beats: [
-    {tag:'entender', h:'The bottleneck was labels, not the model', body:`<p>Training YOLO is one command. Getting thousands of correct boxes is weeks of work. If a <em>zero-shot</em> model (one that detects unseen classes guided by text) proposes the boxes and a person only reviews, the cost drops by an order of magnitude.</p>`},
-    {tag:'simular', h:'One image, end to end', body:`${fig(`
-      <rect class="s-box" x="16" y="20" width="170" height="44" rx="6"/><text class="s-t" x="101" y="47" text-anchor="middle">image 1280×720</text>
-      <rect class="s-box" x="16" y="80" width="170" height="44" rx="6"/><text class="s-t" x="101" y="100" text-anchor="middle">"yellow and black</text><text class="s-t" x="101" y="115" text-anchor="middle">checkered box."</text>
-      <line class="s-line" x1="186" y1="42" x2="226" y2="66" marker-end="url(#arrow)"/><line class="s-line" x1="186" y1="102" x2="226" y2="80" marker-end="url(#arrow)"/>
-      <rect class="s-box-ok" x="230" y="46" width="150" height="54" rx="6"/><text class="s-t" x="305" y="70" text-anchor="middle">Grounding DINO</text><text class="s-d" x="305" y="88" text-anchor="middle">tiny · transformers</text>
-      <line class="s-line" x1="380" y1="73" x2="415" y2="73" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="418" y="46" width="150" height="54" rx="6"/><text class="s-t" x="493" y="68" text-anchor="middle">boxes + scores</text><text class="s-d" x="493" y="86" text-anchor="middle">score ≥ 0.30</text>
-      <line class="s-line" x1="568" y1="73" x2="603" y2="73" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="606" y="46" width="260" height="54" rx="6"/><text class="s-t" x="736" y="68" text-anchor="middle">0 0.375 0.500 0.125 0.444</text><text class="s-d" x="736" y="86" text-anchor="middle">YOLO line: class cx cy w h</text>
-    `, '0 0 880 140', 'One image through the flow. The prompt ends with a period because Grounding DINO splits phrases on periods.', 'Image and text go into Grounding DINO, boxes come out, get filtered and converted to YOLO format')}
-    ${explain('The conversion by hand, with numbers', `<p>Pixel box <code>(x1, y1, x2, y2) = (400, 200, 560, 520)</code> in a 1280×720 image. YOLO wants center and size normalized to 0–1:</p>
-    <p><code>cx = (400+560)/2/1280 = 0.375</code> · <code>cy = (200+520)/2/720 = 0.500</code> · <code>w = 160/1280 = 0.125</code> · <code>h = 320/720 = 0.444</code></p>
-    <p>Normalize by width where height belongs and the boxes shift, yet training throws no error: it silently learns garbage. That's why <code>visualize_annotations.py</code> exists.</p>`)}`},
-    {tag:'escribir', h:'The core of the annotator', body:`${code('src/annotation.py','AutoAnnotator.annotate_image', [
-      '<span class="c1"># Grounding DINO splits phrases on periods</span>',
-      'prompt = prompt <span class="kw">if</span> prompt.endswith(<span class="str">"."</span>) <span class="kw">else</span> prompt + <span class="str">"."</span>',
-      '',
-      'inputs = <span class="kw">self</span>.processor(images=pil_image, text=prompt, return_tensors=<span class="str">"pt"</span>).to(<span class="kw">self</span>.device)',
-      '<span class="kw">with</span> torch.no_grad():',
-      '    outputs = <span class="kw">self</span>.model(**inputs)',
-      '',
-      'results = <span class="kw">self</span>.processor.post_process_grounded_object_detection(',
-      '    outputs, input_ids=inputs.input_ids, target_sizes=[(height, width)])[<span class="num">0</span>]',
-      '',
-      'mask = results[<span class="str">"scores"</span>] >= threshold      <span class="c1"># 0.3 by default</span>',
-      'boxes = results[<span class="str">"boxes"</span>][mask].cpu().numpy()'
-    ].join('\n'))}
-    <p><strong>Decision:</strong> load the model through Hugging Face <code>transformers</code> instead of building the original repo. Installing is trivial and the dependency stays an optional <em>extra</em> (<code>uv sync --extra annotation</code>).</p>`,
-    chips:['a6bf6ad YOLO-World','6b5a4a7 Grounding DINO']},
-    {tag:'medir', h:'Same images, two models', body:`${table(['Metric (47 images)','YOLO-World','Grounding DINO'],[
-      ['Images with any detection','8.5%','100%'],
-      ['Total detections','6','259'],
-      ['Confidence range','0.05–0.09','0.25–0.69'],
-      ['Speed','~25 img/s','~2 img/s']
-    ])}
-    <p>With YOLO-World, prompts like <code>"yellow black checkered cube"</code> or <code>"yellow box"</code> returned zero detections. My hypothesis, not verified: its language side (CLIP) was trained on real photos and struggles with synthetic VR textures.</p>`},
-    {tag:'mirar', h:'Detecting a lot is not detecting well', body:`${caveat('What the table does not say', `<p>"100% coverage" and "259 detections" measure <strong>quantity</strong>, not whether the boxes were right. That's 5.5 detections per image, and I never compared against a hand-labeled set, so I don't know how many were false. My diary said "43× better", which compares counts, not quality.</p>`)}
-    <ul>
-      <li><strong>What I'd do:</strong> hand-label about 50 images as a <em>gold set</em> and measure the annotator's precision and recall at several thresholds before trusting it.</li>
-      <li><strong>The speed trade-off was acceptable</strong>: 12× slower, but annotation is an offline job done once.</li>
-      <li><strong>The underlying risk:</strong> train on labels from another model and you inherit its systematic errors. Whatever the annotator misses, the detector learns to miss.</li>
-    </ul>`}
+    {tag:'entender', h:'Why YOLO26', body:`<p>YOLO26 is <strong>end-to-end, NMS-free</strong>: no box-suppression post-processing, which simplifies TensorRT export and removes CPU work on the device. Fine-tuning retrains the whole model (backbone, neck and head), nothing frozen.</p>`},
+    {tag:'escribir', h:'A versioned recipe', body:`${code('config.yaml', 'excerpt', `epochs: 50\npatience: 20\nclose_mosaic: 10\nbatch: -1      # auto-fit to VRAM\nseed: 42`)}
+    <p>A detail found while aligning the recipe: <code>train.py</code> ignored <code>close_mosaic</code> and <code>cos_lr</code> even when set in the YAML. They are passed through now.</p>`},
+    {tag:'medir', h:'Training results', body:`${table(['Model','Best epoch','val mAP50','val mAP50-95','Time (RTX 5060 Ti)'], [['YOLO26s','37 / 50','0.470','0.311','~100 min'],['YOLO26n','50 / 50','0.395','0.260','~61 min']])}
+    <p>Nano gives up 0.075 mAP50 for a model 4× smaller. Its best epoch was the last one: it was probably undertrained.</p>`},
+    {tag:'mirar', h:'Do not compare numbers from different protocols', body:`<p>Training validation runs at batch 32 with rectangular padding; the benchmark at batch 1. That is why nano <code>Stairs</code> reads 0.330 in one and 0.316 in the other. Only same-protocol numbers are compared.</p>`}
   ],
   qa: [
-    {q:'How do I know the automatic annotations are good?', a:`<p>In this project, only by visual inspection and review with <code>review_annotations.py</code>. That isn't enough. The rigorous way is a hand-labeled <em>gold set</em>, measuring the annotator's precision and recall against it and choosing the threshold from that curve. It's the first thing I'd add.</p>`},
-    {q:'YOLO-World is 12× faster. Why not use it?', a:`<p>Because in this domain it detected almost nothing: 8.5% of images, with confidence below 0.1. Speed doesn't matter if the output is useless, and annotation runs offline anyway. For real-time inference the trade-off would be different.</p>`},
-    {q:'What\'s the risk of training a detector on labels produced by another model?', a:`<p>It copies that model's mistakes. If Grounding DINO misses small or backlit pillars, those cases become background and the detector learns to ignore them. You mitigate it with human review, a gold set to measure the annotator, and hand-adding the hard cases.</p>`}
+    {q:'What fine-tuning methods exist, and which one did I use?', a:`<p>Full fine-tuning (used here), frozen backbone with neck and head trained (fast, little data), progressive unfreezing, distillation (small teaches nano), QAT for INT8, and adapters such as LoRA, more common in transformers.</p>`},
+    {q:'mAP50 or mAP50-95?', a:`<p>mAP50 says whether I find the object; mAP50-95 also whether the box is tight. Warning about an obstacle is mostly about finding it, but a bad box gives a bad distance.</p>`}
   ]
 },
 
-/* 3 · FRAMEWORK */
+/* 3 · METHODOLOGY */
 {
-  id: 'framework', label: 'From script to framework', date: 'Jan 15 – Feb 20, 2026 · 02295c8, 53029a4, f03846c',
-  focus: ['framework'],
-  title: 'Separate the UI from the logic, and remove everything that said "pillar"',
-  sub: 'The project worked for one object and one GPU. Reusing it with any dataset meant breaking up a several-hundred-line app.py and removing what was hardcoded.',
+  id: 'metodologia', label: 'Measuring without fooling myself', date: 'Sep 2026 · docs/BENCHMARK_METHODOLOGY.md',
+  focus: ['exportar','desplegar','medir'],
+  title: 'One protocol on an RTX and on a Jetson',
+  sub: 'The old benchmark timed random noise and reported only a mean. The new one measures real images, percentiles and per-class accuracy, and records the full environment.',
   beats: [
-    {tag:'entender', h:'Everything lived in app.py', body:`<p>The Gradio UI, training, inference and annotation were mixed in a single file. The refactor moved 839 lines into modules. On top of that, paths, class names ("pillar") and GPU parameters were hardcoded.</p>
-    <p>Result: testing a function meant launching the UI, and changing GPU or dataset meant editing code.</p>`},
-    {tag:'simular', h:'The same call on three machines', body:`<p><code>suggest_training_defaults()</code> picks parameters from the detected VRAM:</p>
-    ${table(['Machine','VRAM','batch','workers','cache','amp'],[
-      ['RTX 5060 Ti','16 GB','-1 (auto)','8','ram','yes'],
-      ['RTX 2060','6 GB','8','4','disk','yes'],
-      ['Laptop, no GPU','—','4','4','no','no']
-    ])}
-    <p><code>batch=-1</code> enables Ultralytics AutoBatch, which estimates how many images fit in a fraction of VRAM. The same <code>config.yaml</code> works on different machines.</p>`},
-    {tag:'escribir', h:'Three layers', body:`${fig(`
-      <rect class="s-box" x="60" y="16" width="260" height="50" rx="7"/><text class="s-t" x="190" y="38" text-anchor="middle">app.py · Gradio</text><text class="s-d" x="190" y="55" text-anchor="middle">7 tabs, no logic</text>
-      <rect class="s-box" x="480" y="16" width="260" height="50" rx="7"/><text class="s-t" x="610" y="38" text-anchor="middle">scripts/ · CLI</text><text class="s-d" x="610" y="55" text-anchor="middle">train, inference, export…</text>
-      <line class="s-line" x1="190" y1="66" x2="330" y2="104" marker-end="url(#arrow)"/><line class="s-line" x1="610" y1="66" x2="470" y2="104" marker-end="url(#arrow)"/>
-      <rect class="s-box-ok" x="40" y="108" width="720" height="62" rx="7"/>
-      <text class="s-t" x="400" y="130" text-anchor="middle">src/ · the logic, importable and testable</text>
-      <text class="s-d" x="400" y="152" text-anchor="middle">hardware · project · training · inference · dataset · annotation · benchmark</text>
-      <line class="s-line" x1="400" y1="170" x2="400" y2="196" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="200" y="200" width="400" height="40" rx="7"/><text class="s-t" x="400" y="225" text-anchor="middle">Ultralytics · PyTorch · transformers</text>
-    `, '0 0 800 250', 'The web UI and the CLI are two doors into the same logic. A REST API tomorrow would be a third door without touching src/.', 'Three-layer architecture')}
-    ${code('src/hardware.py','suggest_training_defaults', [
-      'vram = gpu.vram_gb',
-      '<span class="kw">if</span> vram >= <span class="num">16</span>:',
-      '    <span class="kw">return</span> {<span class="str">"batch"</span>: -<span class="num">1</span>, <span class="str">"workers"</span>: <span class="num">8</span>, <span class="str">"cache"</span>: <span class="str">"ram"</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}',
-      '<span class="kw">elif</span> vram >= <span class="num">8</span>:',
-      '    <span class="kw">return</span> {<span class="str">"batch"</span>: -<span class="num">1</span>, <span class="str">"workers"</span>: <span class="num">8</span>, <span class="str">"cache"</span>: <span class="str">"ram"</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}  <span class="c1"># ← identical to the branch above</span>',
-      '<span class="kw">elif</span> vram >= <span class="num">4</span>:',
-      '    <span class="kw">return</span> {<span class="str">"batch"</span>: <span class="num">8</span>, <span class="str">"workers"</span>: <span class="num">4</span>, <span class="str">"cache"</span>: <span class="kw">True</span>, <span class="str">"imgsz"</span>: <span class="num">640</span>, <span class="str">"amp"</span>: <span class="kw">True</span>}'
-    ].join('\n'))}
-    <p>I also moved from <code>pip</code> to <code>uv</code>, with <code>pyproject.toml</code> and optional extras, so heavy dependencies (transformers, FiftyOne) only install when used.</p>`,
-    chips:['02295c8 split app.py into src/','53029a4 remove VR hardcoding','f03846c migrate to uv']},
-    {tag:'medir', h:'A bug the UI couldn\'t show', body:`<p>After a PyTorch update, the UI always showed "GPU: Not available" on a machine with a GPU. The memory attribute the code read didn't exist in that version. The <code>except Exception</code> swallowed the <code>AttributeError</code> and quietly returned "no GPU".</p>
-    ${code('src/hardware.py','fix 0c5018d', [
-      '<span class="c1">- vram_mb = torch.cuda.get_device_properties(0).total_mem // (1024 * 1024)</span>',
-      '<span class="str">+ props = torch.cuda.get_device_properties(0)</span>',
-      '<span class="str">+ total_bytes = getattr(props, "total_memory", None) or getattr(props, "total_mem", 0)</span>',
-      '<span class="str">+ vram_mb = total_bytes // (1024 * 1024)</span>'
-    ].join('\n'))}`,
-    chips:['0c5018d GPU detection fix']},
-    {tag:'mirar', h:'The fix treated the symptom', body:`${caveat('Still there', `<p>The <code>except Exception</code> that hid the bug <strong>is still in the code</strong>. Next time something breaks inside <code>detect_gpu()</code>, the same thing will happen. At minimum it should log the exception. Better, catch only the errors you expect.</p>`)}
-    <ul>
-      <li><strong>The 16 GB and 8 GB branches are identical.</strong> Either the distinction is unnecessary or it's missing different parameters, like <code>imgsz</code>. It's code that looks like a decision it doesn't make.</li>
-      <li><strong>To verify:</strong> <code>pyproject.toml</code> declares commands (<code>fts-train</code>…) but has no <code>[build-system]</code>, so they're probably never installed. The README uses <code>uv run python scripts/…</code>, which does work.</li>
-      <li><strong>What went well:</strong> the <code>src/</code> split is what made unit tests possible without launching Gradio.</li>
-    </ul>`}
+    {tag:'entender', h:'What can fake a measurement', body:`<p>Noise images that do not represent real use. A mean that hides spikes. Forgetting the GPU is asynchronous. Measuring while another process uses the GPU. Evaluating at a different IoU than training (the old script used 0.6, training 0.7). And comparing engines built on another machine.</p>`},
+    {tag:'escribir', h:'The protocol, in code', body:`<ul>
+      <li>500 real val images, fixed seed, <strong>preloaded</strong> in memory: disk is not part of the measurement.</li>
+      <li>50 warm-up inferences and <code>torch.cuda.synchronize()</code> after each run.</li>
+      <li>Mean, p50, p90, p95, p99 end to end, plus the breakdown and the <strong>engine alone</strong>.</li>
+      <li>Global and per-class mAP on the full val split at <code>conf=0.001, iou=0.7, batch=1</code>.</li>
+      <li>Engines built <strong>on the device</strong> that runs them.</li>
+      <li>The script refuses to measure while another process uses the GPU.</li>
+    </ul>`},
+    {tag:'medir', h:'Every number with provenance', body:`<p>Every run writes a JSON with GPU, driver, CUDA, TensorRT, PyTorch, Ultralytics, commit, command and results. The README tables are generated by <code>make_tables.py</code>. A consistency check: <strong>mAP is identical on the RTX and the Jetson</strong> at every precision.</p>`},
+    {tag:'mirar', h:'Versions: identical where I control them', body:`<p>Dataset, weights, commit and Ultralytics 8.4.14 are identical on both devices. TensorRT is not: the RTX 5060 Ti (Blackwell) needs ≥ 10.8 and JetPack 6.2 ships 10.3. That is recorded, not matched.</p>`}
   ],
   qa: [
-    {q:'Why separate src/ from app.py and scripts/?', a:`<p>To have a single implementation of each thing and be able to test it. Before, training from the UI and from the CLI were two paths that could diverge. Now both call <code>src/</code>. And <code>src/</code> imports without loading Gradio, which makes tests fast and CI-friendly.</p>`},
-    {q:'My detect_gpu() has an except Exception. What\'s wrong with that?', a:`<p>It turns any error into a valid-looking result ("no GPU"). It already bit me: a PyTorch API change made the UI report no GPU with no visible error. A broad <code>except</code> is acceptable at the UI edge if it logs. Inside the logic, catch only what you expect and let the unexpected blow up.</p>`},
-    {q:'What does batch=-1 do, and when wouldn\'t I use it?', a:`<p>It enables Ultralytics AutoBatch, which probes memory usage and picks the batch that fits in a fraction of VRAM. I wouldn't use it when I need to reproduce an experiment exactly across machines, since batch size changes training dynamics, or on a GPU shared with other processes, where the estimate can be wrong.</p>`}
+    {q:'Why percentiles and not just the mean?', a:`<p>Because real time fails in the tail. Nano in PyTorch FP32 on the Jetson has a 35 ms mean and a 172 ms p99: every so often it freezes for a moment, which the mean does not show.</p>`},
+    {q:'Why is the engine built on each device?', a:`<p>A TensorRT engine is a plan compiled for one GPU architecture and one version. It is not portable, so each machine builds its own and the file name carries the host.</p>`}
   ]
 },
 
-/* 4 · COMBINED DATASET */
+/* 4 · FP16 / INT8 */
 {
-  id: 'dataset', label: '24 classes without forgetting COCO', date: 'Feb 20–21, 2026 · 39d1a9e, 6107f4e, 8883995',
-  focus: ['datos','dataset','entrenar','evaluar'],
-  title: 'You can\'t add classes to YOLO: you retrain with all of them',
-  sub: 'Assisted navigation needed doors, stairs, street lights, traffic signs, trees and wheelchairs, without losing people, cars or bikes. This phase is the technical core of the project.',
+  id: 'fp16-int8', label: 'FP16, INT8 and a criterion first', date: 'Sep 16–17, 2026',
+  focus: ['exportar','evaluar'],
+  title: 'INT8 did not earn its place',
+  sub: 'Two INT8 routes, two TensorRT bugs and a rule fixed before measuring. Outcome: FP16 in every case.',
   beats: [
-    {tag:'entender', h:'The detection head gets replaced entirely', body:`<p>YOLO's last layer has one output per class. Train with 6 classes and the head has 6 outputs: the model <strong>forgets COCO's 80</strong>. Freezing the backbone (<code>freeze</code>) keeps the features, not the classes.</p>
-    <p>So the final model has to be trained on <strong>all classes at once</strong>, in a single dataset.</p>`},
-    {tag:'simular', h:'Follow one label into the final dataset', body:`${fig(`
-      <rect class="s-box" x="16" y="16" width="300" height="74" rx="7"/>
-      <text class="s-t" x="166" y="38" text-anchor="middle">COCO subset · FiftyOne</text>
-      <text class="s-d" x="166" y="56" text-anchor="middle">18 classes · IDs 0–17 · 8,000 / 2,000</text>
-      <text class="s-ok" x="166" y="76" text-anchor="middle">person → 0 (list order)</text>
-      <rect class="s-box" x="16" y="116" width="300" height="74" rx="7"/>
-      <text class="s-t" x="166" y="138" text-anchor="middle">nav_custom · Open Images V7</text>
-      <text class="s-d" x="166" y="156" text-anchor="middle">6 classes · IDs 0–5 · 3,608 / 571</text>
-      <text class="s-bad" x="166" y="176" text-anchor="middle">Stairs = 1 → collides with bicycle!</text>
-      <line class="s-line" x1="316" y1="53" x2="400" y2="92" marker-end="url(#arrow)"/>
-      <line class="s-line" x1="316" y1="153" x2="400" y2="112" marker-end="url(#arrow)"/>
-      <text class="s-t" x="360" y="140" text-anchor="middle">+18</text>
-      <rect class="s-box-ok" x="404" y="66" width="250" height="74" rx="7"/>
-      <text class="s-t" x="529" y="90" text-anchor="middle">nav_combined</text>
-      <text class="s-d" x="529" y="108" text-anchor="middle">24 classes · 11,608 / 2,571</text>
-      <text class="s-ok" x="529" y="126" text-anchor="middle">Stairs = 19 · coco_/custom_ prefixes</text>
-      <line class="s-line" x1="654" y1="103" x2="700" y2="103" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="704" y="72" width="170" height="62" rx="7"/>
-      <text class="s-t" x="789" y="98" text-anchor="middle">YOLO26s</text>
-      <text class="s-d" x="789" y="116" text-anchor="middle">24-output head</text>
-    `, '0 0 890 200', 'Two sources, one ID space. FiftyOne exports COCO with IDs 0–17 following the class-list order. The custom set also starts at 0, so it has to shift by +18 or stairs would be trained as bicycles.', 'Two datasets merge by remapping IDs')}
-    ${explain('One label line, before and after', `<p>nav_custom file: <code>1 0.52 0.61 0.20 0.35</code>, which is Stairs with ID 1.</p><p>In nav_combined: <code>19 0.52 0.61 0.20 0.35</code>. Coordinates don't change, only the class. If the remap fails there's no error: the model learns stairs are bicycles and both classes' metrics drop for no obvious reason.</p>`)}`},
-    {tag:'escribir', h:'Download only what you need', body:`${code('docs/TRAINING_PROCESS.md','COCO subset with FiftyOne', [
-      'dataset = foz.load_zoo_dataset(',
-      '    <span class="str">"coco-2017"</span>, split=<span class="str">"train"</span>, label_types=[<span class="str">"detections"</span>],',
-      '    classes=[<span class="str">"person"</span>, <span class="str">"car"</span>, <span class="str">"bus"</span>, ...],   <span class="c1"># relevant ones only</span>',
-      '    max_samples=<span class="num">8000</span>)',
-      '',
-      'view = dataset.filter_labels(<span class="str">"ground_truth"</span>, F(<span class="str">"label"</span>).is_in(MY_CLASSES), only_matches=<span class="kw">True</span>)',
-      'view.export(export_dir=<span class="str">"data/coco_nav/train"</span>, dataset_type=fo.types.YOLOv5Dataset,',
-      '            label_field=<span class="str">"ground_truth"</span>, classes=MY_CLASSES)'
-    ].join('\n'))}
-    <p><strong>Decision:</strong> a subset (~4 GB) instead of full COCO (~20 GB). The base model already saw all of COCO; it only needs enough examples not to forget, and classes like <em>pizza</em> or <em>toaster</em> add nothing to navigation.</p>
-    <p>Training: <code>uv run python scripts/train.py --model yolo26s.pt --data data/nav_combined/dataset.yaml --epochs 50</code>, no <code>freeze</code>. About 122 s per epoch on the RTX 5060 Ti.</p>`,
-    chips:['39d1a9e fine-tuning strategy guide','8883995 track yolo26s_nav.pt']},
-    {tag:'medir', h:'0.47 mAP50, with a wide spread per class', body:`${stats([{num:'0.470', lbl:'mAP50'},{num:'0.311', lbl:'mAP50-95'},{num:'0.558', lbl:'precision'},{num:'0.462', lbl:'recall'}])}
-    ${table(['Class','mAP50','Reading'],[
-      ['Cat (COCO)','0.853','strong'],
-      ['Fire hydrant (COCO)','0.748','strong'],
-      ['Person (COCO)','0.738','strong'],
-      ['Wheelchair','0.696','best custom class'],
-      ['Tree','0.497',''],
-      ['Truck (COCO)','0.418','dropped vs the base model'],
-      ['Traffic sign','0.417',''],
-      ['Door','0.410','high indoor/outdoor variety'],
-      ['Stairs','0.318','critical for the product'],
-      ['Street light','0.044','only 7 validation images']
-    ], [6,8,9])}
-    <p>Best epoch was 37 of 50: the remaining 13 added nothing.</p>`,
-    chips:['6107f4e training results']},
-    {tag:'mirar', h:'What I would do differently', body:`${caveat('Three limits worth saying out loud', `<p><strong>1. Street light at 0.044 isn't a metric:</strong> with 7 validation images the number is noise.</p><p><strong>2. I never evaluated on footage from the glasses.</strong> Validation mixes COCO and Open Images, not the real domain where the model runs.</p><p><strong>3. The dataset merge isn't a script.</strong> Downloading, copying, prefixing and remapping were done by hand following the guide. Today I couldn't rebuild <code>nav_combined</code> with one command.</p>`)}
+    {tag:'entender', h:'What quantizing is', body:`<p>Moving weights and activations from floating point to 8-bit integers. Each tensor needs a <strong>scale</strong>, found by <strong>calibrating</strong> with real images. <strong>PTQ</strong> does this on a trained model; <strong>QAT</strong> simulates the rounding during training so the network compensates.</p>
+    ${explain('Criterion written on September 16, before measuring', `<p>INT8 replaces FP16 only if p95 drops by at least 20 %, mAP50 drops by at most 0.01 and <code>Stairs</code> by at most 0.02.</p>`)}`},
+    {tag:'simular', h:'Two traps in the default INT8', body:`<p>Reading Ultralytics 8.4.14: by default it <strong>calibrates on the validation split</strong>, the same one used to score the engine, and builds with only the INT8 flag, so <strong>unquantized layers fall back to FP32</strong>, not FP16. It also uses the MinMax calibrator, which is sensitive to outliers.</p>`},
+    {tag:'escribir', h:'Two routes', body:`<p><strong>Implicit</strong> (<code>int8=True</code>): calibrating on 1,000 train images. <strong>Explicit</strong>: NVIDIA ModelOpt writes a Q/DQ ONNX once, and each device builds its INT8 + FP16 engine from that same file, with the same scales.</p>`},
+    {tag:'medir', h:'Results', body:`${table(['Device · model','FP16 engine','INT8 engine','mAP50 FP16 → INT8','Stairs FP16 → INT8'], [
+      ['RTX · nano (implicit)','0.62 ms','0.84 ms','0.394 → 0.376','0.225 → 0.240'],
+      ['RTX · small (implicit)','1.06 ms','1.21 ms','0.463 → 0.415','0.385 → 0.311'],
+      ['Jetson · nano (Q/DQ)','4.06 ms','4.35 ms','0.394 → 0.371','0.225 → 0.265'],
+      ['Jetson · small (Q/DQ)','6.67 ms','5.10 ms','0.463 → 0.400','0.391 → 0.186']
+    ], [1,3])}
     <ul>
-      <li><strong>Hypothesis about Truck, not verified: missing labels.</strong> Open Images images only have my 6 classes labeled. If a truck appears, it's treated as background and the model learns not to detect it. Same for unlabeled doors in COCO photos.</li>
-      <li><strong>Next steps:</strong> a reproducible dataset script, more data for Stairs and Street light, <code>patience=10</code> with 100 epochs, trying <code>yolo26m</code>, and a real-footage test set.</li>
-    </ul>`}
+      <li>Implicit INT8 <strong>does not build</strong> on TensorRT 10.3 (Jetson): an internal <code>checkSanity</code> assertion, a known bug.</li>
+      <li>Q/DQ <strong>does not build</strong> on TensorRT 10.16 on the RTX (Blackwell): <code>MyelinCheckException</code>, another known bug. It does on the Jetson.</li>
+      <li>No combination passes the criterion. Failures are recorded with the real error.</li>
+    </ul>`},
+    {tag:'mirar', h:'Look per class', body:`${caveat('A drop the global mAP hides', `<p>Converting nano to FP16 costs 0.002 global mAP50, but <code>Stairs</code> falls from 0.316 to 0.225, <strong>identically on both devices</strong>. And PTQ INT8 sinks small\'s <code>Stairs</code> from 0.391 to 0.186. Looking only at the global number, I would have approved both.</p>`)}`}
   ],
   qa: [
-    {q:'Why not freeze the backbone and train only a new head on the 6 classes?', a:`<p>Because the new head would have 6 outputs and the model would stop detecting people and cars, which are also needed. <code>freeze</code> keeps learned features, not classes. For one model with 24 classes you train on all 24 together. The alternative is two models side by side, at the cost of double latency and memory.</p>`},
-    {q:'Street light has 0.044 mAP50. Is the model bad at street lights?', a:`<p>I don't know, and that's the point. With 7 validation images, getting two right or wrong changes the number completely. Before concluding anything I need hundreds of validation examples. Knowing when a metric isn't reliable matters as much as the number.</p>`},
-    {q:'I mix images where only some classes are labeled. What\'s the problem?', a:`<p>Missing labels: a real object without a box is treated as background, and the model learns to suppress it. An Open Images photo with an unlabeled truck penalizes detecting trucks. I think it explains part of the Truck drop, but I haven't measured it. You can mitigate it by pseudo-labeling COCO classes on the custom images with the base model and reviewing them, or by filtering images with unlabeled objects.</p>`}
+    {q:'Why can INT8 be slower than FP16?', a:`<p>If layers without INT8 kernels run in FP32, there are format conversions between layers and compute in the most expensive precision. On small models the INT8 savings are small next to that cost.</p>`},
+    {q:'When would I use INT8 on a Jetson?', a:`<p>FP16 by default. INT8 when the model is large and the GPU is the bottleneck (VLM, depth), when it does not fit in memory, or with DLA (which the Orin Nano lacks), always validated per class and preferably with mixed precision or QAT.</p>`},
+    {q:'What happens if I calibrate on validation data?', a:`<p>The scales fit the very images I then measure on, so the evaluation turns optimistic. It is leakage, like training on the test set.</p>`}
   ]
 },
 
-/* 5 · SPEED */
+/* 5 · JETSON */
 {
-  id: 'velocidad', label: 'Measuring speed honestly', date: 'Feb 20–21, 2026 · 6de1edd, 6107f4e',
-  focus: ['exportar','verificar'],
-  title: 'TensorRT FP16, and how to measure it so the number means something',
-  sub: 'The model shares the GPU with others (depth, gaze), so every millisecond counts. Exporting to TensorRT is easy. Measuring correctly is where it\'s easy to get it wrong.',
+  id: 'jetson', label: 'The network is not the bottleneck', date: 'Sep 17, 2026',
+  focus: ['desplegar','medir'],
+  title: 'On the Jetson the network takes 4 ms and the system 23',
+  sub: 'Nano and small looked equally fast on the Jetson, which made no sense for a model with several times more compute. Timing the bare engine showed why.',
   beats: [
-    {tag:'entender', h:'A latency budget, not brochure FPS', body:`<p>In AriaGuard the detector shares the GPU with other models. What matters is how many milliseconds it uses per frame and how stable that is, more than peak FPS. TensorRT compiles the model for one specific GPU: it fuses layers, picks kernels and uses FP16.</p>`},
-    {tag:'simular', h:'One benchmark iteration, with and without syncing', body:`${fig(`
-      <text class="s-d" x="16" y="22">without torch.cuda.synchronize()</text>
-      <rect class="s-box" x="16" y="30" width="60" height="22" rx="3"/><text class="s-d" x="46" y="45" text-anchor="middle">CPU</text>
-      <rect class="s-box-bad" x="80" y="58" width="300" height="22" rx="3"/><text class="s-bad" x="230" y="73" text-anchor="middle">GPU still working…</text>
-      <line x1="16" y1="90" x2="80" y2="90" style="stroke:var(--danger)" stroke-width="2"/><text class="s-bad" x="90" y="94">clock stops here → "0.4 ms" = wrong</text>
-      <text class="s-d" x="16" y="128">with synchronize()</text>
-      <rect class="s-box" x="16" y="136" width="60" height="22" rx="3"/><text class="s-d" x="46" y="151" text-anchor="middle">CPU</text>
-      <rect class="s-box-ok" x="80" y="164" width="300" height="22" rx="3"/><text class="s-ok" x="230" y="179" text-anchor="middle">GPU working…</text>
-      <line x1="16" y1="196" x2="380" y2="196" style="stroke:var(--ok)" stroke-width="2"/><text class="s-ok" x="390" y="200">clock stops when the GPU is done → real</text>
-    `, '0 0 700 214', 'Illustrative. GPU calls are asynchronous: Python returns as soon as the work is queued. Without syncing, the timer measures queuing, not inference.', 'CPU and GPU timeline with and without synchronization')}
-    <p><strong>Warmup</strong> solves the opposite problem. The first calls include loading the engine, allocating memory and tuning kernels, and can take hundreds of ms. If they land in the mean, they inflate it.</p>`},
-    {tag:'escribir', h:'The measurement loop', body:`${code('scripts/benchmark.py','benchmark_model', [
-      'dummy_img = np.random.randint(<span class="num">0</span>, <span class="num">255</span>, (imgsz, imgsz, <span class="num">3</span>), dtype=np.uint8)',
-      '',
-      '<span class="kw">for</span> _ <span class="kw">in</span> range(warmup):                 <span class="c1"># run and discard</span>',
-      '    model(dummy_img, verbose=<span class="kw">False</span>)',
-      'torch.cuda.synchronize()',
-      '',
-      '<span class="kw">for</span> _ <span class="kw">in</span> range(iterations):',
-      '    start = time.perf_counter()',
-      '    model(dummy_img, verbose=<span class="kw">False</span>)',
-      '    torch.cuda.synchronize()               <span class="c1"># wait for the GPU before stopping the clock</span>',
-      '    times.append(time.perf_counter() - start)',
-      '',
-      '<span class="kw">return</span> {<span class="str">"mean"</span>: ..., <span class="str">"std"</span>: ..., <span class="str">"median"</span>: ..., <span class="str">"fps"</span>: <span class="num">1000</span> / np.mean(times_ms)}'
-    ].join('\n'))}
-    <p>Export: <code>uv run python scripts/export_tensorrt.py --format engine --half</code>.</p>`},
-    {tag:'medir', h:'YOLO26m on RTX 5060 Ti (200 iterations, 20 warmup)', body:`${table(['Format','Mean','Std','FPS','vs PyTorch'],[
-      ['PyTorch','8.86 ms','0.19 ms','112.9','1.0×'],
-      ['ONNX (CPU, not valid)','177.06 ms','10.55 ms','5.6','—'],
-      ['TensorRT FP16','3.02 ms','0.03 ms','331.3','2.9×']
-    ], [1])}
-    ${stats([{num:'2.9×', lbl:'faster than PyTorch', good:true},{num:'110 → 52 W', lbl:'peak power'},{num:'451', lbl:'FPS · YOLO26s FP16 (nav)'}])}
-    <p>At peak, TensorRT also drew less power: 52 W versus 110 W, according to <code>nvidia-smi dmon</code>.</p>`,
-    chips:['6de1edd benchmark guide','6107f4e 451 FPS yolo26s_nav']},
-    {tag:'mirar', h:'What this benchmark does not tell you', body:`${caveat('Limits of the number', `<p><strong>Random-noise image:</strong> no camera decoding and no real objects, so almost no detections. On real video the per-frame time will be higher.</p><p><strong>The 451 FPS has no recorded procedure.</strong> It appears in the project notes, but no command, commit or log comes with it. The documented method is the one behind 331 FPS (YOLO26m). Today I can't reproduce that 451 exactly.</p><p><strong>The ONNX row is invalid:</strong> it ran on CPU because <code>onnxruntime-gpu</code> was missing. Comparing it to the GPU rows makes no sense.</p>`)}
-    <ul>
-      <li><strong>Mean and std only.</strong> For a safety system the tail matters: I'd add p95 and p99. AriaGuard did that later.</li>
-      <li><strong>I didn't measure the FP16 engine's accuracy</strong> against the <code>.pt</code>. FP16 usually loses very little, but "usually" isn't data. I'd run <code>yolo val</code> on both.</li>
-      <li><strong>Desktop GPU</strong>, not the target Jetson.</li>
-      <li><strong>Rule I took away:</strong> every number ships with its command, commit and hardware.</li>
-    </ul>`}
+    {tag:'entender', h:'An anomaly', body:`<p>FP16 end to end: nano 22.9 ms, small 23.3 ms. If the GPU were the limit, small would show. Hypothesis: the bottleneck is the CPU (pre-processing, Python, frequency scaling).</p>`},
+    {tag:'simular', h:'Where the 22.9 ms go', body:`${fig(latencyBarSvg({pre:'pre-processing (CPU)', engine:'engine', wrap:'code around it', post:'post-processing', other:'other'}), '0 0 900 110', 'Nano FP16 on the Jetson, measured. The engine (green) is 4.1 ms; CPU pre-processing, the Ultralytics code around the engine and post-processing make up the rest.', 'Latency bar of nano FP16 on Jetson')}`},
+    {tag:'medir', h:'Confirmed twice', body:`${table(['Jetson · FP16','Engine alone','End to end'], [['nano','4.06 ms','22.89 ms'],['small','6.67 ms','23.32 ms']])}
+    <p>Timed through the TensorRT API in the benchmark and with NVIDIA\'s <code>trtexec</code>: they agree within ±0.1 ms. AriaGuard showed the same: ~19 FPS with the GPU at 50-74 %.</p>`},
+    {tag:'mirar', h:'What to optimize first', body:`<p>Before a faster model: <code>jetson_clocks</code>, drop the desktop, GPU pre-processing and, finally, a C++ pipeline straight to TensorRT. And remember the Jetson has <strong>unified memory</strong>: there is no VRAM to reserve.</p>`}
   ],
   qa: [
-    {q:'Why do I call torch.cuda.synchronize() inside the loop?', a:`<p>Because GPU operations are asynchronous relative to the CPU. Without syncing, <code>perf_counter()</code> stops when the work is queued, not finished, and you measure unrealistically low times. Syncing before stopping the clock ensures you measure the full inference.</p>`},
-    {q:'What is the warmup for?', a:`<p>The first inferences include one-off costs: loading the engine, allocating memory and tuning kernels. They can take hundreds of ms versus ~3 ms steady-state. If they land in the mean they inflate it, and since FPS = 1000/mean, the error carries straight through. You run them and discard them.</p>`},
-    {q:'Does TensorRT FP16 lose accuracy? Did I measure it?', a:`<p>It can lose a little from rounding in sensitive layers. There's no record in this repo of comparing the <code>.engine</code>'s mAP to the <code>.pt</code>'s, so I can't claim anything. It's the first thing I'd do before deploying: <code>yolo val</code> with both on the same set.</p>`}
+    {q:'Isn\'t CUDA already heavily optimized?', a:`<p>Yes: those 4 ms are CUDA and TensorRT. What is slow runs on the CPU before and after, on Cortex-A78AE cores far slower than a desktop CPU, with single-threaded Python.</p>`},
+    {q:'Do more models need more GPU?', a:`<p>In general yes, but the first resource to run out decides. Count each model\'s rate, memory per process (one CUDA context each) and the pipeline\'s CPU. Today, on this Jetson, the CPU runs out first.</p>`}
   ]
 },
 
-/* 6 · METHODOLOGY */
+/* 6 · STAIRS */
 {
-  id: 'metodologia', label: 'Build, verify, deploy', date: 'Dec 2025 → Jul 2026 · 5f0e9d4, 7c671ca',
-  focus: ['verificar','usar','framework'],
-  title: 'What "it works" means in an ML repo',
-  sub: 'Code that doesn\'t break, valid data, a model that meets the bar and something that runs where it\'s used are four different things. This phase covers what is verified today and what isn\'t.',
+  id: 'stairs', label: 'Auto-annotating stairs', date: 'Sep 16–17, 2026 · pre-registered',
+  focus: ['anotar','dataset','entrenar','evaluar','verificar'],
+  title: 'What is labelling with a word worth?',
+  sub: 'Stairs matters most to a blind pedestrian and is one of the weakest classes. Grounding DINO can label stairs from the word "stairs". The experiment measures what that shortcut costs.',
   beats: [
-    {tag:'entender', h:'Four different questions', body:`${table(['Question','How it\'s answered here','Status'],[
-      ['Does the code do what it says?','pytest unit tests (annotate, split, visualize)','yes'],
-      ['Is the data valid?','dataset integrity tests','yes, locally'],
-      ['Is the model good?','evaluate.py + results.csv','manual'],
-      ['Does it run where it\'s used?','TensorRT export + benchmark','manual, no CI']
-    ])}`},
-    {tag:'simular', h:'A clean clone, before and after the fix', body:`${fig(`
-      <text class="s-d" x="16" y="22">before · uv sync --extra dev && pytest</text>
-      <rect class="s-box" x="16" y="30" width="170" height="40" rx="6"/><text class="s-t" x="101" y="55" text-anchor="middle">collect tests</text>
-      <line class="s-line" x1="186" y1="50" x2="222" y2="50" marker-end="url(#arrow)"/>
-      <rect class="s-box-bad" x="226" y="30" width="270" height="40" rx="6"/><text class="s-bad" x="361" y="55" text-anchor="middle">import transformers → ERROR</text>
-      <line class="s-line" x1="496" y1="50" x2="532" y2="50" marker-end="url(#arrow)"/>
-      <rect class="s-box-bad" x="536" y="30" width="300" height="40" rx="6"/><text class="s-bad" x="686" y="55" text-anchor="middle">run aborted · 45 tests hidden</text>
-      <text class="s-d" x="16" y="104">after · 7c671ca</text>
-      <rect class="s-box" x="16" y="112" width="170" height="40" rx="6"/><text class="s-t" x="101" y="137" text-anchor="middle">dev includes annotation</text>
-      <line class="s-line" x1="186" y1="132" x2="222" y2="132" marker-end="url(#arrow)"/>
-      <rect class="s-box" x="226" y="112" width="270" height="40" rx="6"/><text class="s-t" x="361" y="137" text-anchor="middle">no data/ → skip · partial → fail</text>
-      <line class="s-line" x1="496" y1="132" x2="532" y2="132" marker-end="url(#arrow)"/>
-      <rect class="s-box-ok" x="536" y="112" width="300" height="40" rx="6"/><text class="s-ok" x="686" y="137" text-anchor="middle">45 passed · 9 skipped</text>
-    `, '0 0 850 166', 'One collection error aborts the whole run, and a healthy repo looks broken. The fix makes the dev extra install what the tests import, and makes data tests skip when there is no dataset.', 'pytest flow before and after the fix')}`},
-    {tag:'escribir', h:'The full loop, with its gates', body:`${fig(`
-      ${[['Build','uv · config.yaml','s-box'],['Verify','pytest','s-box-ok'],['Train','train.py','s-box'],['Evaluate','per-class mAP','s-box'],['Export','TensorRT','s-box'],['Deploy','AriaGuard','s-box']].map(([t,d,c],i)=>{
-        const x = 16 + i*146;
-        return `<rect class="${c}" x="${x}" y="24" width="126" height="54" rx="7"/>
-        <text class="s-t" x="${x+63}" y="47" text-anchor="middle">${t}</text><text class="s-d" x="${x+63}" y="65" text-anchor="middle">${d}</text>
-        ${i<5?`<line class="s-line" x1="${x+126}" y1="51" x2="${x+143}" y2="51" marker-end="url(#arrow)"/>`:''}`;}).join('')}
-      <text class="s-bad" x="162" y="100" text-anchor="middle">gate: tests green</text>
-      <text class="s-bad" x="600" y="100" text-anchor="middle">gate: mAP ≥ previous (manual)</text>
-      <text class="s-d" x="455" y="124" text-anchor="middle">deliverable: models/yolo26s_nav.pt in git → each machine builds its own .engine</text>
-    `, '0 0 900 136', 'The actual methodology. Only the first gate is automatic locally, and none run in CI.', 'Loop: build, verify, train, evaluate, export, deploy')}
-    ${code('tests/test_data_integrity.py','skip if missing · fail if incomplete', [
-      '<span class="kw">def</span> <span class="fn">test_train_structure</span>(<span class="kw">self</span>, data_dir):',
-      '    dataset_dir = data_dir / <span class="str">"dataset"</span>',
-      '    <span class="kw">if not</span> dataset_dir.exists():',
-      '        pytest.skip(<span class="str">"data/dataset/ not found (gitignored local artifact)"</span>)',
-      '    <span class="c1"># if it exists, the full structure is required</span>'
-    ].join('\n'))}
-    <p><strong>Decision:</strong> keep <code>yolo26s_nav.pt</code> (20 MB) in git because it's the only artifact that can't be regenerated without retraining. The <code>.engine</code> isn't versioned: it depends on the GPU and the TensorRT version.</p>`,
-    chips:['5f0e9d4 test suite (47 tests)','7c671ca unblock collection','8883995 track model']},
-    {tag:'medir', h:'What the tests cover', body:`${table(['File','What it checks'],[
-      ['test_auto_annotate.py','NMS, YOLO format, template matching'],
-      ['test_split_dataset.py','image/label pairs, ratios'],
-      ['test_visualize.py','loading annotations, pixel conversion'],
-      ['test_grounding_dino.py','zero-shot annotator'],
-      ['test_data_integrity.py','structure, format, coordinate ranges'],
-      ['test_integration.py','configs, models, inference script']
-    ])}
-    ${stats([{num:'45', lbl:'passed', good:true},{num:'9', lbl:'skipped (no data/)'},{num:'0', lbl:'CI jobs'}])}`},
-    {tag:'mirar', h:'Engineering gaps', body:`${caveat('What\'s missing to call it robust', `<p><strong>No CI:</strong> I removed the GitHub Actions pipeline in August 2026, so today nothing stops a merge with failing tests.</p><p><strong>Data tests never run outside my machine.</strong> A test that always skips in CI protects nothing. It needs a tiny sample dataset in <code>tests/fixtures</code>.</p><p><strong>No model regression check:</strong> nothing verifies that retraining doesn't make mAP worse.</p>`)}
-    <ul>
-      <li><strong>No deployed demo:</strong> <code>app.py</code> is already Gradio. A CPU Hugging Face Space with images would be feasible.</li>
-      <li><strong>Model in git</strong> instead of Hugging Face Hub or a Release with a model card. Fine for one, doesn't scale.</li>
-      <li><strong>No Docker and no LICENSE file</strong>, even though <code>pyproject</code> says MIT.</li>
-    </ul>`}
+    {tag:'entender', h:'Design and criterion first', body:`<p>Three nano models, same recipe: <strong>A</strong> baseline; <strong>B</strong> + 1,000 stairs images labelled by Grounding DINO; <strong>C</strong> + the same images with human labels. Design and criterion were committed before training.</p>
+    ${explain('Criterion', `<p>Auto-annotation is worth it if B gains at least half of what C gains, C gains at least 0.02, and B does not hurt the rest by more than 0.01.</p>`)}`},
+    {tag:'simular', h:'Pseudo-label quality', body:`<p>Against the human boxes at IoU ≥ 0.5: <strong>precision 0.59</strong> (4 in 10 boxes are extra) and <strong>recall 0.72</strong>. 1,554 boxes against 1,291 human ones; 17 images got none.</p>`},
+    {tag:'medir', h:'Result', body:`${fig(stairsBarsSvg(['A · baseline','B · auto labels','C · human labels']), '0 0 600 185', 'Stairs AP50 on the test set (120 images, 140 instances). B captures 0.079 of the 0.126 that C gains.', 'Bars of Stairs AP50 per arm')}
+    <p>B gains <strong>+0.079</strong>, C <strong>+0.126</strong>: auto-annotation captures <strong>63 %</strong> and does not hurt the global score (0.398 vs 0.396). <strong>It passes the criterion.</strong> At AP50-95, B and C are within 0.005: the auto boxes are tight; what fails is extra or missed stairs.</p>`},
+    {tag:'mirar', h:'Limits', body:`${caveat('Do not over-generalize', `<p>One seed per arm; 140 test instances (the Open Images test split had no more); photos, not first-person video. On val (45 instances) B beats C, which shows why the test set was the primary metric.</p>`)}`}
   ],
   qa: [
-    {q:'Why do I version the .pt in git and not the .engine?', a:`<p>The <code>.pt</code> is hours of training and can't be regenerated without redoing it. The <code>.engine</code> is a build for one GPU and one TensorRT version: an engine from my RTX won't run on a Jetson. You version the portable source and each target builds its own. At larger scale I'd use Hugging Face Hub or Releases with versions and a model card.</p>`},
-    {q:'A test that skips when data/ is missing: isn\'t that a test that never fails?', a:`<p>In CI, yes, and that's its weakness. Locally it's useful: it skips with no dataset but fails on an incomplete one, which I verified by creating a partial one. The full fix is a tiny dataset in <code>tests/fixtures</code> so the validation logic always runs.</p>`},
-    {q:'What would I add first to make this "production"?', a:`<p>In order: CI running pytest on CPU, a small data fixture, a reproducible dataset-build script, and a regression evaluation that compares per-class mAP against the previous model before publishing a new one. Then the demo and the model card.</p>`}
+    {q:'Why did no human review the automatic labels?', a:`<p>Because the design already had human reference labels for those images: the auto-annotator\'s quality can be measured exactly, with no manual work.</p>`},
+    {q:'What is pre-registration and why does it matter?', a:`<p>Writing down the design and the decision rule before seeing results. It stops me from picking, afterwards, the metric that gives the conclusion I like. The document\'s commit predates every result.</p>`}
   ]
 },
 
 /* 7 · LOOK BACK */
 {
   id: 'mirar-atras', label: 'Look back: what I would change', date: 'Sep 2026', focus: 'all',
-  title: 'What turns "I solved it" into "I learned something"',
-  sub: 'The last step of the method, applied to the whole project.',
+  title: 'What I would do differently next time',
+  sub: 'The project started as something else and grew in pieces. These are the lessons I take to the next ones.',
   intro: `
-  ${fig(`
-    ${[['1','Leak-free split','by video or scene','s-box-bad'],['2','Dataset script','reproducible nav_combined','s-box-bad'],['3','Real-footage test','from the glasses','s-box-bad'],['4','CI + fixtures','pytest on every push','s-box'],['5','Demo + model card','HF Space / Hub','s-box']].map(([n,t,d,c],i)=>{
-      const x = 16 + i*178;
-      return `<rect class="${c}" x="${x}" y="20" width="160" height="70" rx="7"/>
-      <text class="s-d" x="${x+12}" y="38">${n}</text>
-      <text class="s-t" x="${x+80}" y="58" text-anchor="middle">${t}</text>
-      <text class="s-d" x="${x+80}" y="76" text-anchor="middle">${d}</text>`;}).join('')}
-    <text class="s-bad" x="270" y="112" text-anchor="middle">decide whether the numbers are true</text>
-    <text class="s-d" x="712" y="112" text-anchor="middle">decide maturity</text>
-  `, '0 0 910 124', 'Priorities if I started today. The first three come first because without them the metrics on this page aren\'t fully trustworthy.', 'Five ordered priorities')}
-  <div class="pitch">
-    <span class="lbl">What I learned</span>
-    <p><strong>1. The labels are the project.</strong> Training is one command; getting, remapping and validating labels is where the time goes and where silent errors hide.</p>
-    <p><strong>2. A number without a procedure is worthless.</strong> The 98.7% was leaky, the "43× better" counted boxes and the 451 FPS can't be reproduced. Now every metric ships with its command, commit and hardware.</p>
-    <p><strong>3. Averages hide what matters.</strong> Inverted pillars, Stairs, p95: the critical case has to be measured on its own.</p>
-    <p><strong>4. Silent errors are the expensive ones.</strong> A broad <code>except</code>, a bad ID remap or a random split don't crash: they give a wrong result that looks right.</p>
-  </div>`,
+  ${table(['Lesson','Why'], [
+    ['Dataset built by code from day one','Rebuilding it later meant doing archaeology on downloads'],
+    ['Per-class metrics from the start','The global number approved changes that sank Stairs'],
+    ['Time the bare engine from the start','Without it I blamed the GPU for a CPU limit'],
+    ['Do not trust a library\'s default INT8','It calibrated on validation and left layers in FP32'],
+    ['Criterion written before measuring','Stops the conclusion from being fitted to the numbers'],
+    ['Record failures too','Two TensorRT bugs are findings, not holes in the table']
+  ])}
+  ${explain('Next', `<p>A faster pipeline before a faster model (GPU pre-processing, C++); INT8 that keeps accuracy (mixed precision or QAT) only once the engine dominates; JetPack 7.2.1 on the Jetson; a first-person test set from open Aria recordings.</p>`)}
+  `,
   beats: [],
-  qa: [
-    {q:'If I started over, what would I do differently from day one?', a:`<p>Design the evaluation before the model: a leak-free split, a test set from the real domain (footage from the glasses) and per-class metrics for the classes the product depends on. In this project evaluation came later, which is why some numbers are optimistic.</p>`},
-    {q:'What would I do with one more week?', a:`<p>Days 1–2: reproducible <code>nav_combined</code> script and a fixed split. Day 3: record and label a real-video test set. Day 4: retrain with <code>patience</code> and compare YOLO26s vs YOLO26m on that set. Day 5: CI, data fixture and model card. No new features until the numbers are measured properly.</p>`},
-    {q:'What am I proudest of, and what was my biggest mistake?', a:`<p>Proudest of the combined-dataset strategy and the annotation flow with human review, which solve the real problem of getting data. My biggest mistake was trusting a 98.7% from a split that leaked frames. It's a classic mistake; I caught it when reviewing the project, and that's why it's explained in the first phase instead of hidden.</p>`}
-  ]
-}
-/* ───────────────────────── 8 · GLOSARIO ───────────────────────── */
-,{
-  id: 'glosario', label: 'Concepts: what it taught me', date: '8 phases', focus: 'all', kicker: 'Glossary',
+  qa: []
+},
+
+/* 8 · GLOSSARY */
+{
+  id: 'glosario', label: 'Concepts: what it taught me', date: '7 phases', focus: 'all', kicker: 'Glossary',
   title: 'Project glossary',
-  sub: 'Concepts from every phase in one place, to review and check what I can explain.',
+  sub: 'The concepts from every phase in one place, to review and check what I can explain.',
   intro: conceptsHtml('en'),
   beats: [],
   qa: []
 }
 ];
+
 
 /* ===== Explainer engine (shared across repos) =====
    Content lives in PAGE (defined above): PAGE.ui.{es,en}, PAGE.steps.{es,en}.
