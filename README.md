@@ -1,5 +1,7 @@
 # Vision Fine-Tuning · navigation obstacle detector
 
+[![tests](https://github.com/robertteleng/vision-fine-tuning/actions/workflows/tests.yml/badge.svg)](https://github.com/robertteleng/vision-fine-tuning/actions/workflows/tests.yml) [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+
 A reproducible pipeline for a **24-class obstacle detector for blind and low-vision pedestrians**,
 from dataset to edge deployment: build the data, fine-tune **YOLO26** nano and small, score them
 per class, export to **TensorRT FP16/INT8** and benchmark on an **RTX 5060 Ti** and a **Jetson Orin Nano**.
@@ -197,6 +199,11 @@ tests/              pytest
 - [Stairs auto-annotation experiment](docs/EXPERIMENT_STAIRS.md), pre-registered
 - [Training process and the combined dataset](docs/TRAINING_PROCESS.md) (Spanish)
 - [Lab: FP32 → FP16 → INT8](docs/LAB_FP16_INT8.md), a learning exercise (Spanish)
+
+## License
+
+[AGPL-3.0](LICENSE). The project builds on [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) (AGPL-3.0), and the
+fine-tuned weights in `models/` are derived from its YOLO26 checkpoints, so they fall under the same license.
 
 ## Stack
 

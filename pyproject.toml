@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Reproducible YOLO26 pipeline for a navigation obstacle detector, from dataset to edge benchmark"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = {text = "AGPL-3.0-or-later"}
 
 dependencies = [
     # Core
